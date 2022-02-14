@@ -44,3 +44,64 @@ References to include :
 4.) Basal forebrain :  in preparation  
 5.) Hippocampus subfields : in preparation  
 6.) QC : in preparation
+
+
+## column names
+
+we try to use descriptive names - details are available for most from the LONI website.
+
+* Age is estimated to within a month accuracy for the visit date
+
+* Categorical visit date is denoted by `EVENT_ID`
+
+* CHR* SNPs
+
+* `resnetGrade` gives a continuous estimate of image quality
+
+* Subscore - derived subscore variables
+
+* `Analytic_Cohort` denotes whether the subject/visit is designated a member of the official PPMI analytic cohort.
+
+* brain related variables are denoted with left / right as well as 
+    * area, thk (thickness ) or vol (volume)
+    * DSD (instead of left/right) indicates dominant side disease
+
+* for mtl regions, we have (EC is entorhinal cortex):
+
+| anatomy         |
+|--------------|
+| right aLEC |
+| left pMEC  |
+| right pMEC |
+| left perirhinal |
+| right perirhinal |
+| left parahippocampal |
+| right parahippocampal |
+| left DG/CA3 |
+| right DG/CA3 |
+| left CA1 |
+| right CA1 |
+| left subiculum |
+| right subiculum |
+
+
+* for cit 168 regions, we have ( noting that regions vary greatly in size/reliability ) :
+
+| short name | anatomy         |
+|--------------|--------------|
+| BN_STR_Pu |   putamen |
+| BN_STR_Ca | caudate | 
+| BN_STR_NAC | nucleus accumbens  |
+|EXA_ |  extended amygdala |
+|BN_GP_GPe | globus pallidus external segment |
+|BN_GP_GPi | globus pallidus internal segment |
+|MTg_SN_SNc | substantia nigra pars compacta |
+|MTg_RN_ | red nucleus |
+|MTg_SN_SNr | substantia nigra pars reticulata  |
+|MTg_VTR_PBP | parabrachial pigmental nucleus |
+|MTg_VTR_VTA |  ventral tegmental area |
+|BN_GP_VeP | ventral pallidum |
+|THM_ETH_HN | habenular nucleus |
+|Die_HTH | hypothalamus |
+|Die_HTH_MN |  hypothalamus mamillary nucleus |
+|Die_STH | subthalamic nucleus |
