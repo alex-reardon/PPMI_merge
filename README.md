@@ -105,3 +105,13 @@ we try to use descriptive names - details are available for most from the LONI w
 |Die_HTH | hypothalamus |
 |Die_HTH_MN |  hypothalamus mamillary nucleus |
 |Die_STH | subthalamic nucleus |
+
+
+
+## how to use this file
+
+1.  select the cohort based on one of the diagnostic columns `DX4cat` `DXsimplified` `Consensus.Subtype` or `Consensus.Diagnosis` - potentially only use the `Analytic.Cohort` subjects.
+2.  associate some outcome with diagnosis, while controlling for Age Sex and potentially `brainVol` if using imaging data.
+3.  Consider the time variable if doing longitudinal analysis.
+4.  Consider the values of `resnetGrade` if using imaging; e.g. reject data with grade less than 0.75 or 1.25 ( F and C respectively )
+5.  Medication status can be important for looking at assessments related to motor function: e.g. use `On.PD.Treatment.UPDRS3.Cat` as a covariate
