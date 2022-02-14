@@ -112,10 +112,11 @@ we try to use descriptive names - details are available for most from the LONI w
 
 1.  select the cohort based on one of the diagnostic columns `DX4cat` `DXsimplified` `Consensus.Subtype` or `Consensus.Diagnosis` - potentially only use the `Analytic.Cohort` subjects.
 2.  associate some outcome with diagnosis, while controlling for Age Sex and potentially `brainVol` if using imaging data.
-3.  Consider the time variable if doing longitudinal analysis.
-4.  Consider the values of `resnetGrade` if using imaging; e.g. reject data with grade less than 0.75 or 1.25 ( F and C respectively ).
-5.  Medication status can be important for looking at assessments related to motor function: e.g. use `On.PD.Treatment.UPDRS3.Cat` as a covariate.
-6.  Missing data is coded as NA  - this will limit power substantially as variables are only sparesely avaiable, in general.
-7.  The `DSD` imaging related variables are filtered for presence/absence across the cohort and adjusted for the dominant disease side ; these may be better to use than raw left/right variables.  At least for questions related to motor assessments.
-8.  Draw a picture, draw a picture, draw a picture.
-9.  Let us know if you have questions/concerns.
+3.  education and disease duration might also be considered important covariates.
+4.  Consider the time variable if doing longitudinal analysis.
+5.  Consider the values of `resnetGrade` if using imaging; e.g. reject data with grade less than 0.75 or 1.25 ( F and C respectively ).
+6.  Medication status can be important for looking at assessments related to motor function: e.g. use `On.PD.Treatment.UPDRS3.Cat` as a covariate.
+7.  Missing data is coded as NA  - this will limit power substantially as variables are only sparesely avaiable, in general.
+8.  The `DSD` imaging related variables are filtered for presence/absence across the cohort and adjusted for the dominant disease side ; these may be better to use than raw left/right variables.  At least for questions related to motor assessments.
+9.  Draw a picture, draw a picture, draw a picture.
+10.  Let us know if you have questions/concerns.
