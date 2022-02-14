@@ -115,3 +115,4 @@ we try to use descriptive names - details are available for most from the LONI w
 3.  Consider the time variable if doing longitudinal analysis.
 4.  Consider the values of `resnetGrade` if using imaging; e.g. reject data with grade less than 0.75 or 1.25 ( F and C respectively )
 5.  Medication status can be important for looking at assessments related to motor function: e.g. use `On.PD.Treatment.UPDRS3.Cat` as a covariate
+6.  Missing data is coded as NA  - this will limit power substantially as variables are only sparesely avaiable, in general.
