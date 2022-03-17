@@ -1,4 +1,4 @@
-## Tests for n in ppmi_merge file 
+## Tests for Ns in ppmi_merge file 
 
 import pandas as pd
 userdir = '/Users/areardon/Desktop/ppmi_merge/versions/'
