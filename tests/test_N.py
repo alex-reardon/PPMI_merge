@@ -119,4 +119,13 @@ def test_n_variable(df, cohort, dx, subtype, event_id, variable) :
 variable_n = test_n_variable(ppmi_merge, cohort = 'Consensus', dx = 'Parkinson\'s Disease' , subtype = 'Sporadic', event_id = 'Baseline', variable = 'T1.s3.Image.Name')
 
 
+## Functions to create tables
+def get_mean_variables(df, col_name, dx, event_id, variable) : 
+    subtype_df = df[(df[col_name] == dx) & (df['Event.ID'] == event_id) & (df[variable] != 'NA')]
+    if len(subtype_df) == 0 : 
+        raise Exception(f'No {dx}s with {variable} {event_id} visit')
+
+    mean_subtype_df = subtype_df[variable].mean() # Get averages
+    return mean_subtype_df
+
 
