@@ -54,6 +54,47 @@ def create_cohort_df(xlsx, sheet) :
 
     return cohort_df
 
+
+def merge_columns(df : pd.DataFrame , old_df_columns : list, new_df_column_name : str, separator = str) : 
+    """
+    Takes entries in each of old_df_columns and joins them together with a sepator of choice.  Removes 
+    empty/nan column entries.  
+    """
+    df = df.replace(r'^\s*$', np.NaN, regex=True) # Fill in empty cells with nan
+    df[new_df_column_name] = df[old_df_columns].agg(lambda x: x.dropna().str.cat(sep= separator), axis=1) # Combine columns
+    df.drop(old_df_columns, axis = 1, inplace = True)
+    return df 
+
+
+def getNamesFromDataframe(df, str) :
+    col_names = [col for col in df.columns if str in col]
+    return col_names
+
+
+def merge_new_csv(df, csv_filename, list_cols) : 
+    demo_df = pd.read_csv(ppmi_download_path + csv_filename)
+    demo_df = demo_df[list_cols]
+    ppmi_merge = pd.merge(df, demo_df, on = ['PATNO', 'EVENT_ID'], how = "outer") # Merge
+    return ppmi_merge
+
+
+def isNaN(num):
+    return num != num 
+
+
+def decode_0_1_no_yes(df, list) : 
+    for i in list :
+        df[i] = df[i].astype(int, errors = "ignore")
+        df[i].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
+    return df 
+
+def decode_none2severe(df, list): 
+    for i in list : 
+        df[i] = df[i].astype(int, errors = "ignore")
+        df[i].replace({0 : 'None', 1 : 'Slight', 2: 'Mild', 3 : 'Moderate', 4 : 'Severe'}, inplace = True) 
+    return df 
+
+
 # Create cohort df 
 pd_df = create_cohort_df(xlsx, 'PD') # Create Parkinson's Disease data frame from 'PD' sheet in 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
 prodromal_df = create_cohort_df(xlsx, 'Prodromal')
@@ -190,35 +231,6 @@ full_df['CONSWEDD'].replace({1 : 'SWEDD',  0 : 'SWEDD/PD'}, inplace = True)
 full_df['Comments'].replace({'MSA' : 'Multiple System Atrophy'}, inplace = True)
 full_df['PHENOCNV'].replace({0 : 'No', 1 : 'Yes'}, inplace = True) 
 
-def merge_columns(df : pd.DataFrame , old_df_columns : list, new_df_column_name : str, separator = str) : 
-    """
-    Takes entries in each of old_df_columns and joins them together with a sepator of choice.  Removes 
-    empty/nan column entries.  
-    """
-    df = df.replace(r'^\s*$', np.NaN, regex=True) # Fill in empty cells with nan
-    df[new_df_column_name] = df[old_df_columns].agg(lambda x: x.dropna().str.cat(sep= separator), axis=1) # Combine columns
-    df.drop(old_df_columns, axis = 1, inplace = True)
-    return df 
-
-def getNamesFromDataframe(df, str) :
-    col_names = [col for col in df.columns if str in col]
-    return col_names
-
-def merge_new_csv(df, csv_filename, list_cols) : 
-    demo_df = pd.read_csv(ppmi_download_path + csv_filename)
-    demo_df = demo_df[list_cols]
-    ppmi_merge = pd.merge(df, demo_df, on = ['PATNO', 'EVENT_ID'], how = "outer") # Merge
-    return ppmi_merge
-
-def isNaN(num):
-    return num != num 
-
-def decode_0_1_vars(df, list) : 
-    for i in list :
-        df[i].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
-    return df 
-
-
 # Decode and re-organize full_df
 full_df = merge_columns(full_df, ['CONPD', 'CONPROD', 'CONHC', 'CONSWEDD'], 'Consensus.Diagnosis_temp', ', ') # Get one column for Consensus Diagnosis called Consensus.Diagnosis_temp
 full_df = merge_columns(full_df, ['Consensus.Diagnosis_temp', 'Comments'], 'Consensus.Diagnosis', ': ') # Include the 'Comments' column in with Consensus.Diagnosis_temp into a new column called 'Consensus.Diagnosis'
@@ -232,9 +244,7 @@ analytic_cohort_subids = full_df['PATNO'].unique() # subids for analytic cohort
 age_df = pd.read_csv(ppmi_download_path + 'Age_at_visit.csv', skipinitialspace = True) # Age info
 age_df.rename(columns = {'AGE_AT_VISIT' : 'Age'}, inplace = True) # Rename column 
 ppmi_merge = pd.merge(full_df, age_df, on = 'PATNO', how = "outer") # Merge full_df with age_df
-
-# If 'EVENT_ID' column is empty - fill with LOG - for subject 41358 which has no age information so the df is filled in with EVENT_ID as empty - change this to LOG 
-ppmi_merge['EVENT_ID'].fillna('LOG', inplace = True) # Replace nan cells with 'LOG' in EVENT_ID column -- FIXME (not sure if I should fill this with LOG)
+ppmi_merge['EVENT_ID'].fillna('LOG', inplace = True) # Replace nan cells with 'LOG' in EVENT_ID column -- FIXME (not sure if I should fill this with LOG)-subject 41358 
 
 ## Add birth date, sex, and handedness
 ppmi_merge = merge_new_csv(ppmi_merge, 'Demographics.csv', ['PATNO','EVENT_ID','SEX', 'HANDED', 'BIRTHDT']) # Bday, sex, handedness
@@ -257,20 +267,19 @@ for row_num in range(len(ppmi_merge['PD.Diagnosis.Date'])) :
 
 # Add Final (FNL) Event ID and info 
 ppmi_merge = merge_new_csv(ppmi_merge, 'Conclusion_of_Study_Participation.csv', ['PATNO', 'EVENT_ID', 'COMPLT', 'WDRSN', 'WDDT']) # completed study, whithdrawal reason, withdrawal date  
-ppmi_merge['COMPLT'].replace({1 : 'Yes', 0 : 'No'}, inplace = True) 
+ppmi_merge['COMPLT'].replace({0 : 'No', 1 : 'Yes'}, inplace = True) 
 ppmi_merge['WDRSN'].replace({1 : 'Adverse Event', 2 : 'Completed study per protocol',3 : 'Death', 4 : 'Family, care-partner, or social issues', 5 : 'Lost to follow up', 6 : 'Non-compliance with study procedures' , 7 : 'Transportation/Travel issues' , 8 : 'Institutionalized' , 9 : 'Subject transitioning to a new cohort' , 10 : 'Subject withdrew consent', 11 : 'Investigator decision', 12 : 'Sponsor decision', 13 : 'Informant/caregiver decision' , 20 : 'Other'}, inplace = True) 
 ppmi_merge.rename(columns = {'COMPLT' : 'Completed.Study' , 'WDRSN': 'Reason.for.Withdrawal','WDDT' : 'Withdrawal.Date'}, inplace = True)
 
 ## Diagnosis change - add diagnosis change info on event id 
-# Get condensed df of event ids and diagnosis of Phenoconverted 1st time 
-diag_vis1 = full_df[['PATNO', 'DIAG1', 'DIAG1VIS']]
-diag_vis1.rename(columns = {'DIAG1VIS' : 'EVENT_ID'}, inplace = True)
-diag_vis1.dropna(subset = ['EVENT_ID'], inplace = True)
+def condensed_df(df, keep_col_list, rename_col_dict, drop_col_list) : 
+    new_df = df[keep_col_list]
+    new_df.rename(columns = rename_col_dict, inplace = True)
+    new_df.dropna(subset = drop_col_list, inplace = True)
+    return new_df
 
-# Get condensed df of event ids and daignosis of Phenoconverted 2nd time
-diag_vis2 = full_df[['PATNO', 'DIAG2', 'DIAG2VIS']]
-diag_vis2.rename(columns = {'DIAG2VIS' : 'EVENT_ID'}, inplace = True)
-diag_vis2.dropna(subset = ['EVENT_ID'], inplace = True)
+diag_vis1 = condensed_df(full_df,['PATNO', 'DIAG1', 'DIAG1VIS'],  {'DIAG1VIS' : 'EVENT_ID'}, ['EVENT_ID'])
+diag_vis2 = condensed_df(full_df, ['PATNO', 'DIAG2', 'DIAG2VIS'],  {'DIAG2VIS' : 'EVENT_ID'},['EVENT_ID'])
 
 ppmi_merge.drop(['DIAG1', 'DIAG1VIS', 'DIAG2', 'DIAG2VIS'], axis = 1, inplace = True) # Drop these from ppmi_merge so there aren't duplicates when we merge the diag_vis dfs
 ppmi_merge = pd.merge(diag_vis1, ppmi_merge, on = ['EVENT_ID', 'PATNO'], how = "outer" ) # Merge in first diagnosis change
@@ -287,23 +296,12 @@ ppmi_merge['DOMSIDE'].replace({1 : 'Left', 2 : 'Right', 3 : 'Symmetric'}, inplac
 ppmi_merge = merge_new_csv(ppmi_merge, 'Participant_Motor_Function_Questionnaire.csv', ['PATNO','EVENT_ID','PAG_NAME','CMPLBY2','TRBUPCHR','WRTSMLR','VOICSFTR','POORBAL','FTSTUCK','LSSXPRSS','ARMLGSHK','TRBBUTTN','SHUFFLE','MVSLOW','TOLDPD'])
 ppmi_merge['CMPLBY2'].replace({1: 'Participant', 2 : 'Caregiver' , 3 : 'Participant and Caregivier'}, inplace = True)
 ppmi_merge['PAG_NAME'].replace({'PQUEST' : 'Participant Motor Function Questionnaire'}, inplace = True) 
-ppmi_merge['TRBUPCHR'].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True) 
-ppmi_merge['WRTSMLR'].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
-ppmi_merge['VOICSFTR'].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
-ppmi_merge['POORBAL'].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
-ppmi_merge['FTSTUCK'].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
-ppmi_merge['LSSXPRSS'].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
-ppmi_merge['ARMLGSHK'].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
-ppmi_merge['TRBBUTTN' ].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
-ppmi_merge['SHUFFLE'].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
-ppmi_merge['MVSLOW'].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
-ppmi_merge['TOLDPD'].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
+ppmi_merge = decode_0_1_no_yes(ppmi_merge, ['TRBUPCHR','WRTSMLR', 'VOICSFTR', 'POORBAL', 'FTSTUCK', 'LSSXPRSS', 'ARMLGSHK', 'TRBBUTTN', 'SHUFFLE', 'MVSLOW', 'TOLDPD'])
 ppmi_merge = ppmi_merge.rename(columns = {'PAG_NAME' : 'Motor.Function.Page.Name', 'CMPLBY2' : 'Motor.Function.Source', 'TRBUPCHR' : 'Trouble.Rising.Chair', 'WRTSMLR' : 'Writing.Smaller', 'VOICSFTR' : 'Voice.Softer' , 'POORBAL': 'Poor.Balance' , 'FTSTUCK' : 'Feet.Stuck', 'LSSXPRSS' : 'Less.Expressive' , 'ARMLGSHK':'Arms/Legs.Shake', 'TRBBUTTN' : 'Trouble.Buttons' , 'SHUFFLE' : 'Shuffle.Feet' , 'MVSLOW' : 'Slow.Movements' , 'TOLDPD' : 'Been.Told.PD' })
 
 ## Cognitive symptoms - Cognitive Categorization
 ppmi_merge = merge_new_csv(ppmi_merge, 'Cognitive_Categorization.csv',['PATNO' , 'EVENT_ID', 'PAG_NAME', 'COGDECLN', 'FNCDTCOG' , 'COGDXCL' ,'PTCGBOTH' , 'COGSTATE' , 'COGCAT_TEXT']) # Visit date, weight and height 
-ppmi_merge['COGDECLN'].replace({0 : 'No', 1 : 'Yes'}, inplace = True) 
-ppmi_merge['FNCDTCOG'].replace({0 : 'No', 1 : 'Yes'}, inplace = True) 
+ppmi_merge = decode_0_1_no_yes(ppmi_merge, ['COGDECLN', 'FNCDTCOG'])
 ppmi_merge['COGDXCL'].replace({1 : '90 - 100%', 2 : '50 - 89%', 3 : '10 - 49%', 4 : '0 - 9%'}, inplace = True) 
 ppmi_merge['PTCGBOTH'].replace({1 : 'Participant', 2 : 'Caregiver', 3 : 'Participant and Caregiver'}, inplace = True) 
 ppmi_merge['COGSTATE'].replace({1 : 'Normal Condition', 2 : 'Mild Cognitive Impairment', 3 : 'Dimentia'}, inplace = True) 
@@ -387,6 +385,7 @@ for row_num in range(len(ppmi_merge['Analytic.Cohort'])) :
 ## Reindex 
 ppmi_merge = ppmi_merge.reindex(columns = ['PATNO', 'EVENT_ID', 'INFODT' , 'Enroll.Diagnosis', 'Enroll.Subtype', 'Consensus.Diagnosis', 'Consensus.Subtype','Analytic.Cohort','Subject.Phenoconverted','First.Diagnosis.Change', 'Second.Diagnosis.Change',  'First.Symptom.Date', 'PD.Diagnosis.Date', 'PD.Diagnosis.Duration','BirthDate', 'Age', 'Sex', 'Handed', 'Weight(kg)',	'Height(cm)', 'Education.Years', 'DOMSIDE', 'Motor.Function.Page.Name',	'Motor.Function.Source',	'Trouble.Rising.Chair',	'Writing.Smaller',	'Voice.Softer',	'Poor.Balance',	'Feet.Stuck',	'Less.Expressive',	'Arms/Legs.Shake',	'Trouble.Buttons',	'Shuffle.Feet',	'Slow.Movements',	'Been.Told.PD',	'Cognitive.Page.Name',	'Cognitive.Source', 'Cognitive.Decline',	'Functional.Cognitive.Impairment',	'Confidence.Level.Cognitive.Diagnosis',	'Cognitive.State',	'Cognitive.Tscore.Cat',	'MOCA.Total', 'Medication' , 'LEDD' , 'LEDD.STARTDT' , 'LEDD.STOPDT', 'Medical.History.Description(Diagnosis.Date)'])
 
+## Add in other csvs
 ppmi_merge = merge_new_csv(ppmi_merge, 'Modified_Boston_Naming_Test.csv', ['PATNO', 'EVENT_ID', 'MBSTNSCR', 'MBSTNCRC', 'MBSTNCRR', 'MBSTNVRS'])
 ppmi_merge = merge_new_csv(ppmi_merge, 'Clock_Drawing.csv', ['PATNO', 'EVENT_ID', 'CLCKTOT'])
 ppmi_merge = merge_new_csv(ppmi_merge, 'Benton_Judgement_of_Line_Orientation.csv', ['PATNO', 'EVENT_ID', 'JLO_TOTCALC'])
@@ -403,8 +402,7 @@ ppmi_merge['REM.Sleep.Behavior.Disorder.Page.Name'].replace({'REMSLEEP' : 'REM S
 ppmi_merge['PTCGBOTH'].replace({1 : 'Participant', 2 : 'Caregiver', 3: 'Participant and Caregiver'}, inplace = True)
 rem_list = ['DRMVIVID',	'DRMAGRAC',	'DRMNOCTB',	'SLPLMBMV',	'SLPINJUR',	'DRMVERBL',	'DRMFIGHT',	'DRMUMV',	'DRMOBJFL',	'MVAWAKEN',	'DRMREMEM',	'SLPDSTRB',	'STROKE',	'HETRA',	'PARKISM',	'RLS','NARCLPSY',	'DEPRS',	'EPILEPSY',	'BRNINFM',	'CNSOTH']
 ppmi_merge['RBDTotal.REM'] = ppmi_merge[rem_list].sum(axis = 1) # Add an RBDTotal.REM column
-for rem_item in rem_list : 
-  ppmi_merge[rem_item].replace({0 : 'No', 1 : 'Yes'}, inplace = True)
+ppmi_merge = decode_0_1_no_yes(ppmi_merge,rem_list)
 ppmi_merge.rename(columns = {'PTCGBOTH' : 'Sleep.Behavior.Source.REM','DRMVIVID' : 'Vivid.Dreams.REM' , 'DRMAGRAC': 'Aggressive.or.Action-packed.Dreams.REM',	'DRMNOCTB':'Nocturnal.Behaviour.REM','SLPLMBMV':'Move.Arms/legs.During.Sleep.REM', 'SLPINJUR':'Hurt.Bed.Partner.REM',	'DRMVERBL':'Speaking.in.Sleep.REM',	'DRMFIGHT': 'Sudden.Limb.Movements.REM',	'DRMUMV':'Complex.Movements.REM',	'DRMOBJFL':'Things.Fell.Down.REM',	'MVAWAKEN':'My.Movements.Awake.Me.REM',	'DRMREMEM':'Remember.Dreams.REM',	'SLPDSTRB':'Sleep.is.Disturbed.REM',	'STROKE':'Stroke.REM',	'HETRA':'Head.Trauma.REM',	'PARKISM':'Parkinsonism.REM',	'RLS':'RLS.REM',	'NARCLPSY':'Narcolepsy.REM',	'DEPRS':'Depression.REM',	'EPILEPSY':'Epilepsy.REM',	'BRNINFM':'Inflammatory.Disease.of.the.Brain.REM',	'CNSOTH':'Other.REM'}, inplace = True)
 
 
@@ -412,7 +410,6 @@ ppmi_merge.rename(columns = {'PTCGBOTH' : 'Sleep.Behavior.Source.REM','DRMVIVID'
 ## DATSCAN
 ppmi_merge = merge_new_csv(ppmi_merge,'DaTScan_Analysis.csv', ['PATNO','EVENT_ID','DATSCAN_DATE','DATSCAN_CAUDATE_R','DATSCAN_CAUDATE_L','DATSCAN_PUTAMEN_R','DATSCAN_PUTAMEN_L','DATSCAN_ANALYZED','DATSCAN_NOT_ANALYZED_REASON'])
 ppmi_merge = merge_new_csv(ppmi_merge,'DaTScan_Imaging.csv', ['PATNO','EVENT_ID','PAG_NAME','INFODT','DATSCAN','PREVDATDT','SCNLOC','SCNINJCT','VSINTRPT','VSRPTELG'])
-ppmi_merge.to_csv('/Users/areardon/Desktop/ppmi_merge1111.csv')
 ppmi_merge['DATSCAN'].replace({0 : 'Not Completed', 1: 'Completed', 2 : 'Completed using a previously acquired DaTscan (i.e., acquired prior to participant\'s consent to PPMI)' }, inplace = True)
 ppmi_merge['SCNLOC'].replace({ 1 : 'Site', 2 : 'IND'}, inplace = True )
 ppmi_merge['SCNINJCT'].replace({ 1 : 'DaTSCAN', 2 : 'Beta-CIT'}, inplace = True)
@@ -429,9 +426,7 @@ for i in range(len(ppmi_merge['INFODT'])) :
 mri_df = pd.read_csv(ppmi_download_path + 'Magnetic_Resonance_Imaging__MRI_.csv', skipinitialspace=True)
 mri_df = mri_df[[ 'PATNO', 'EVENT_ID', 'INFODT', 'MRICMPLT', 'MRIWDTI', 'MRIWRSS', 'MRIRSLT', 'MRIRSSDF' ]] # Keep only 
 mri_df['MRICMPLT'].replace({0 : 'Not Completed', 1 : 'Completed'}, inplace = True) # Decode
-mri_df['MRIWDTI'].replace({0 : 'No', 1 : 'Yes'}, inplace = True) # Decode
-mri_df['MRIWRSS'].replace({0 : 'No', 1 : 'Yes'}, inplace = True) # Decode
-mri_df['MRIRSSDF'].replace({0 : 'No', 1 : 'Yes'}, inplace = True) # Decode
+mri_df = decode_0_1_no_yes(mri_df, ['MRIWDTI','MRIWRSS','MRIRSSDF'])
 mri_df['MRIRSLT'].replace({1 : 'Normal', 2 : 'Abnormal, not clinically significant', 3 : 'Abnormal, clinically significant'}, inplace = True) # Decode
 mri_df.rename(columns = { 'INFODT' : 'Image.Acquisition.Date', 'MRICMPLT' : 'MRI.Completed', 'MRIWDTI' : 'MRI.DTI' , 'MRIWRSS' : 'MRI.Resting.State' , 'MRIRSLT' : 'MRI.Results' , 'MRIRSSDF' : 'Resting.State.Dif.Day.PDMed.Use'}, inplace = True) # Rename
 
@@ -566,26 +561,17 @@ updrs_numeric = updrs_numeric[numeric_vars]
 updrs_numeric.rename(columns = {'NHY.UPDRS3' : 'Hoehn.and.Yahr.Stage.UPDRS3', 'NP3BRADY.UPDRS3' : 'Global.Spontaneity.of.Movement.UPDRS3', 'NP3PTRMR.UPDRS3' : 'Postural.Tremor.Right.Hand.UPDRS3' , 'NP3PTRML.UPDRS3' : 'Postural.Tremor.Left.Hand.UPDRS3' , 'NP3KTRMR.UPDRS3' : 'Kinetic.Tremor.Right.Hand.UPDRS3', 'NP3KTRML.UPDRS3' : 'Kinetic.Tremor.Left.Hand.UPDRS3', 'NP3RTARU.UPDRS3' : 'Rest.Tremor.Amplitude.RUE.UPDRS3', 'NP3RTALU.UPDRS3' : 'Rest.Tremor.Amplitude.LUE.UPDRS3', 'NP3RTARL.UPDRS3' : 'Rest.Tremor.Amplitude.RLE.UPDRS3' ,'NP3RTALL.UPDRS3' : 'Rest.Tremor.Amplitude.LLE.UPDRS3' ,'NP3RTALJ.UPDRS3' : 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3', 'NP3RTCON.UPDRS3' : 'Constancy.of.Rest.Tremor.UPDRS3', 'NP3SPCH.UPDRS3' : 'UPDRS3.Speech.Difficulty.UPDRS3', 'NP3FACXP.UPDRS3' : 'Facial.Expression.Difficulty.UPDRS3' , 'NP3RIGN.UPDRS3' : 'Rigidity.Neck.UPDRS3' , 'NP3RIGRU.UPDRS3' : 'Rigidity.RUE.UPDRS3', 'NP3RIGLU.UPDRS3' : 'Rigidity.LUE.UPDRS3', 'NP3RIGRL.UPDRS3' : 'Rigidity.RLE.UPDRS3', 'NP3RIGLL.UPDRS3' : 'Rigidity.LLE.UPDRS3', 'NP3FTAPR.UPDRS3' : 'Finger.Tapping.Right.Hand.UPDRS3' ,'NP3FTAPL.UPDRS3' : 'Finger.Tapping.Left.Hand.UPDRS3' ,'NP3HMOVR.UPDRS3' : 'Hand.Movements.Right.Hand.UPDRS3', 'NP3HMOVL.UPDRS3' : 'Hand.Movements.Left.Hand.UPDRS3', 'NP3PRSPR.UPDRS3' : 'Pronation.Supination.Right.Hand.UPDRS3', 'NP3PRSPL.UPDRS3' : 'Pronation.Supination.Left.Hand.UPDRS3' , 'NP3TTAPR.UPDRS3' : 'Toe.Tapping.Right.Foot.UPDRS3' , 'NP3TTAPL.UPDRS3' : 'Toe.Tapping.Left.Foot.UPDRS3', 'NP3LGAGR.UPDRS3' : 'Leg.Agility.Right.Leg.UPDRS3', 'NP3LGAGL.UPDRS3' : 'Leg.Agility.Left.Leg.UPDRS3', 'NP3RISNG.UPDRS3' : 'UPDRS3.Rising.from.Chair.UPDRS3', 'NP3GAIT.UPDRS3' : 'Gait.Problems.UPDRS3' ,'NP3FRZGT.UPDRS3' : 'Freezing.of.Gait.UPDRS3' ,'NP3PSTBL.UPDRS3' : 'Postural.Stability.Problems.UPDRS3', 'NP3POSTR.UPDRS3' : 'Posture.Problems.UPDRS3' , 'NP3TOT.UPDRS3':'UPDRS.Part3.Total.UPDRS3', 'NP3SPCH.UPDRS3A' : 'UPDRS3.Speech.Difficulty.UPDRS3A', 'NP3FACXP.UPDRS3A' : 'Facial.Expression.Difficulty.UPDRS3A' , 'NP3RIGN.UPDRS3A' : 'Rigidity.Neck.UPDRS3A' , 'NP3RIGRU.UPDRS3A' : 'Rigidity.RUE.UPDRS3A', 'NP3RIGLU.UPDRS3A' : 'Rigidity.LUE.UPDRS3A', 'NP3RIGRL.UPDRS3A' : 'Rigidity.RLE.UPDRS3A', 'NP3RIGLL.UPDRS3A' : 'Rigidity.LLE.UPDRS3A', 'NP3FTAPR.UPDRS3A' : 'Finger.Tapping.Right.Hand.UPDRS3A' ,'NP3FTAPL.UPDRS3A' : 'Finger.Tapping.Left.Hand.UPDRS3A' ,'NP3HMOVR.UPDRS3A' : 'Hand.Movements.Right.Hand.UPDRS3A', 'NP3HMOVL.UPDRS3A' : 'Hand.Movements.Left.Hand.UPDRS3A' ,'NP3PRSPR.UPDRS3A' : 'Pronation.Supination.Right.Hand.UPDRS3A', 'NP3PRSPL.UPDRS3A' : 'Pronation.Supination.Left.Hand.UPDRS3A' , 'NP3TTAPR.UPDRS3A' : 'Toe.Tapping.Right.Foot.UPDRS3A' , 'NP3TTAPL.UPDRS3A' : 'Toe.Tapping.Left.Foot.UPDRS3A', 'NP3LGAGR.UPDRS3A' : 'Leg.Agility.Right.Leg.UPDRS3A', 'NP3LGAGL.UPDRS3A' : 'Leg.Agility.Left.Leg.UPDRS3A', 'NP3RISNG.UPDRS3A' : 'UPDRS3.Rising.from.Chair.UPDRS3A', 'NP3GAIT.UPDRS3A' : 'Gait.Problems.UPDRS3A' ,'NP3FRZGT.UPDRS3A' : 'Freezing.of.Gait.UPDRS3A' ,'NP3PSTBL.UPDRS3A' : 'Postural.Stability.Problems.UPDRS3A', 'NP3POSTR.UPDRS3A' : 'Posture.Problems.UPDRS3A' , 'NP3TOT.UPDRS3A':'UPDRS.Part3.Total.UPDRS3A', 'NHY.UPDRS3A' : 'Hoehn.and.Yahr.Stage.UPDRS3A', 'NP3BRADY.UPDRS3A' : 'Global.Spontaneity.of.Movement.UPDRS3A', 'NP3PTRMR.UPDRS3A' : 'Postural.Tremor.Right.Hand.UPDRS3A' , 'NP3PTRML.UPDRS3A' : 'Postural.Tremor.Left.Hand.UPDRS3A' , 'NP3KTRMR.UPDRS3A' : 'Kinetic.Tremor.Right.Hand.UPDRS3A', 'NP3KTRML.UPDRS3A' : 'Kinetic.Tremor.Left.Hand.UPDRS3A', 'NP3RTARU.UPDRS3A' : 'Rest.Tremor.Amplitude.RUE.UPDRS3A', 'NP3RTALU.UPDRS3A' : 'Rest.Tremor.Amplitude.LUE.UPDRS3A', 'NP3RTARL.UPDRS3A' : 'Rest.Tremor.Amplitude.RLE.UPDRS3A' ,'NP3RTALL.UPDRS3A' : 'Rest.Tremor.Amplitude.LLE.UPDRS3A' ,'NP3RTALJ.UPDRS3A' : 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3A', 'NP3RTCON.UPDRS3A' : 'Constancy.of.Rest.Tremor.UPDRS3A','NP3SPCH.UPDR3OF' : 'UPDRS3.Speech.Difficulty.UPDR3OF', 'NP3FACXP.UPDR3OF' : 'Facial.Expression.Difficulty.UPDR3OF' , 'NP3RIGN.UPDR3OF' : 'Rigidity.Neck.UPDR3OF' , 'NP3RIGRU.UPDR3OF' : 'Rigidity.RUE.UPDR3OF', 'NP3RIGLU.UPDR3OF' : 'Rigidity.LUE.UPDR3OF', 'NP3RIGRL.UPDR3OF' : 'Rigidity.RLE.UPDR3OF', 'NP3RIGLL.UPDR3OF' : 'Rigidity.LLE.UPDR3OF', 'NP3FTAPR.UPDR3OF' : 'Finger.Tapping.Right.Hand.UPDR3OF' ,'NP3FTAPL.UPDR3OF' : 'Finger.Tapping.Left.Hand.UPDR3OF' ,'NP3HMOVR.UPDR3OF' : 'Hand.Movements.Right.Hand.UPDR3OF', 'NP3HMOVL.UPDR3OF' : 'Hand.Movements.Left.Hand.UPDR3OF' , 'NP3PRSPR.UPDR3OF' : 'Pronation.Supination.Right.Hand.UPDR3OF', 'NP3PRSPL.UPDR3OF' : 'Pronation.Supination.Left.Hand.UPDR3OF' , 'NP3TTAPR.UPDR3OF' : 'Toe.Tapping.Right.Foot.UPDR3OF' , 'NP3TTAPL.UPDR3OF' : 'Toe.Tapping.Left.Foot.UPDR3OF', 'NP3LGAGR.UPDR3OF' : 'Leg.Agility.Right.Leg.UPDR3OF', 'NP3LGAGL.UPDR3OF' : 'Leg.Agility.Left.Leg.UPDR3OF', 'NP3RISNG.UPDR3OF' : 'UPDRS3.Rising.from.Chair.UPDR3OF', 'NP3GAIT.UPDR3OF' : 'Gait.Problems.UPDR3OF' ,'NP3FRZGT.UPDR3OF' : 'Freezing.of.Gait.UPDR3OF' ,'NP3PSTBL.UPDR3OF' : 'Postural.Stability.Problems.UPDR3OF', 'NP3POSTR.UPDR3OF' : 'Posture.Problems.UPDR3OF' , 'NP3TOT.UPDR3OF':'UPDRS.Part3.Total.UPDR3OF','NHY.UPDR3OF' : 'Hoehn.and.Yahr.Stage.UPDR3OF', 'PDTRTMNT.UPDR3OF' : 'On.PD.Treatment.UPDR3OF','NP3BRADY.UPDR3OF' : 'Global.Spontaneity.of.Movement.UPDR3OF', 'NP3PTRMR.UPDR3OF' : 'Postural.Tremor.Right.Hand.UPDR3OF' , 'NP3PTRML.UPDR3OF' : 'Postural.Tremor.Left.Hand.UPDR3OF' , 'NP3KTRMR.UPDR3OF' : 'Kinetic.Tremor.Right.Hand.UPDR3OF', 'NP3KTRML.UPDR3OF' : 'Kinetic.Tremor.Left.Hand.UPDR3OF', 'NP3RTARU.UPDR3OF' : 'Rest.Tremor.Amplitude.RUE.UPDR3OF', 'NP3RTALU.UPDR3OF' : 'Rest.Tremor.Amplitude.LUE.UPDR3OF', 'NP3RTARL.UPDR3OF' : 'Rest.Tremor.Amplitude.RLE.UPDR3OF' ,'NP3RTALL.UPDR3OF' : 'Rest.Tremor.Amplitude.LLE.UPDR3OF' ,'NP3RTALJ.UPDR3OF' : 'Rest.Tremor.Amplitude.Lip.Jaw.UPDR3OF', 'NP3RTCON.UPDR3OF' : 'Constancy.of.Rest.Tremor.UPDR3OF', 'NP3SPCH.UPDR3ON' : 'UPDRS3.Speech.Difficulty.UPDR3ON', 'NP3FACXP.UPDR3ON' : 'Facial.Expression.Difficulty.UPDR3ON' , 'NP3RIGN.UPDR3ON' : 'Rigidity.Neck.UPDR3ON' , 'NP3RIGRU.UPDR3ON' : 'Rigidity.RUE.UPDR3ON', 'NP3RIGLU.UPDR3ON' : 'Rigidity.LUE.UPDR3ON', 'NP3RIGRL.UPDR3ON' : 'Rigidity.RLE.UPDR3ON', 'NP3RIGLL.UPDR3ON' : 'Rigidity.LLE.UPDR3ON', 'NP3FTAPR.UPDR3ON' : 'Finger.Tapping.Right.Hand.UPDR3ON' ,'NP3FTAPL.UPDR3ON' : 'Finger.Tapping.Left.Hand.UPDR3ON' ,'NP3HMOVR.UPDR3ON' : 'Hand.Movements.Right.Hand.UPDR3ON', 'NP3HMOVL.UPDR3ON' : 'Hand.Movements.Left.Hand.UPDR3ON' ,'NP3PRSPR.UPDR3ON' : 'Pronation.Supination.Right.Hand.UPDR3ON', 'NP3PRSPL.UPDR3ON' : 'Pronation.Supination.Left.Hand.UPDR3ON' , 'NP3TTAPR.UPDR3ON' : 'Toe.Tapping.Right.Foot.UPDR3ON' , 'NP3TTAPL.UPDR3ON' : 'Toe.Tapping.Left.Foot.UPDR3ON', 'NP3LGAGR.UPDR3ON' : 'Leg.Agility.Right.Leg.UPDR3ON', 'NP3LGAGL.UPDR3ON' : 'Leg.Agility.Left.Leg.UPDR3ON', 'NP3RISNG.UPDR3ON' : 'UPDRS3.Rising.from.Chair.UPDR3ON', 'NP3GAIT.UPDR3ON' : 'Gait.Problems.UPDR3ON' ,'NP3FRZGT.UPDR3ON' : 'Freezing.of.Gait.UPDR3ON' ,'NP3PSTBL.UPDR3ON' : 'Postural.Stability.Problems.UPDR3ON', 'NP3POSTR.UPDR3ON' : 'Posture.Problems.UPDR3ON', 'NHY.UPDR3ON' : 'Hoehn.and.Yahr.Stage.UPDR3ON', 'NP3BRADY.UPDR3ON' : 'Global.Spontaneity.of.Movement.UPDR3ON', 'NP3PTRMR.UPDR3ON' : 'Postural.Tremor.Right.Hand.UPDR3ON' , 'NP3PTRML.UPDR3ON' : 'Postural.Tremor.Left.Hand.UPDR3ON' , 'NP3KTRMR.UPDR3ON' : 'Kinetic.Tremor.Right.Hand.UPDR3ON', 'NP3KTRML.UPDR3ON' : 'Kinetic.Tremor.Left.Hand.UPDR3ON', 'NP3RTARU.UPDR3ON' : 'Rest.Tremor.Amplitude.RUE.UPDR3ON', 'NP3RTALU.UPDR3ON' : 'Rest.Tremor.Amplitude.LUE.UPDR3ON', 'NP3RTARL.UPDR3ON' : 'Rest.Tremor.Amplitude.RLE.UPDR3ON' ,'NP3RTALL.UPDR3ON' : 'Rest.Tremor.Amplitude.LLE.UPDR3ON' ,'NP3TOT.UPDR3ON':'UPDRS.Part3.Total.UPDR3ON', 'NP3RTALJ.UPDR3ON' : 'Rest.Tremor.Amplitude.Lip.Jaw.UPDR3ON', 'NP3RTCON.UPDR3ON' : 'Constancy.of.Rest.Tremor.UPDR3ON','NP1COG.UPDRS1' : 'Cognitive.Impairment.UPDRS1', 'NP1HALL.UPDRS1' : 'Hallucinations.and.Psychosis.UPDRS1', 'NP1DPRS.UPDRS1' : 'Depressed.Moods.UPDRS1', 'NP1ANXS.UPDRS1' : 'Anxious.Moods.UPDRS1', 'NP1APAT.UPDRS1' : 'Apathy.UPDRS1', 'NP1DDS.UPDRS1' : 'Features.of.Dopamine.Dysregulation.Syndrome.UPDRS1', 'NP1RTOT.UPDRS1' : 'UPDRS.Part1.Rater.Completed.Total.UPDRS1','NP1SLPN.UPDRS1' : 'Sleep.Problems.Night.UPDRS1', 'NP1SLPD.UPDRS1' : 'Daytime.Sleepiness.UPDRS1', 'NP1PAIN.UPDRS1' : 'Pain.UPDRS1' , 'NP1URIN.UPDRS1' : 'Urinary.Problems.UPDRS1', 'NP1CNST.UPDRS1' : 'Constipation.Problems.UPDRS1' , 'NP1LTHD.UPDRS1' : 'Lightheadedness.on.Standing.UPDRS1' , 'NP1FATG.UPDRS1' : 'Fatigue.UPDRS1', 'NP1PTOT.UPDRS1' : 'UPDRS.Part1.Patient.Completed.Total.UPDRS1','NP2SPCH.UPDRS2' : 'UPDRS2.Speech.Difficulty.UPDRS2' , 'NP2SALV.UPDRS2' : 'Saliva.Drooling.UPDRS2' ,'NP2SWAL.UPDRS2': 'Chewing.Swallowing.Difficulty.UPDRS2', 'NP2EAT.UPDRS2' : 'Eating.Difficulty.UPDRS2', 'NP2DRES.UPDRS2' : 'Dressing.Difficulty.UPDRS2', 'NP2HYGN.UPDRS2' : 'Hygiene.Difficulty.UPDRS2' , 'NP2HWRT.UPDRS2' : 'Handwriting.Difficulty.UPDRS2' ,'NP2HOBB.UPDRS2' : 'Hobbies.Difficulty.UPDRS2' ,'NP2TURN.UPDRS2' : 'Turning.in.Bed.Difficulty.UPDRS2', 'NP2TRMR.UPDRS2' : 'Tremor.UPDRS2', 'NP2RISE.UPDRS2' : 'UPDRS2.Rising.from.Chair.Difficulty.UPDRS2', 'NP2WALK.UPDRS2' : 'Walking.Difficulty.UPDRS2' ,'NP2FREZ.UPDRS2' : 'Freezing.while.Walking.UPDRS2' , 'NP2PTOT.UPDRS2': 'UPDRS.Part2.Total.UPDRS2', 'NP4WDYSK.UPDRS4' : 'Time.Spent.with.Dyskinesias.UPDRS4', 'NP4DYSKI.UPDRS4':'Functional.Impact.of.Dyskinesias.UPDRS4','NP4OFF.UPDRS4' : 'Time.Spent.in.OFF.State.UPDRS4', 	'NP4FLCTI.UPDRS4':'Functional.Impact.Fluctuations.UPDRS4',	'NP4FLCTX.UPDRS4':'Complexity.of.Motor.Fluctuations.UPDRS4' ,	'NP4DYSTN.UPDRS4':'Painful.OFF-state.Dystonia.UPDRS4' ,'NP4TOT.UPDRS4': 'UPDRS.Part4.Total.UPDRS4','NP4WDYSKDEN.UPDRS4':'4.1.Time.with.Dyskinesias.UPDRS4', 'NP4WDYSKNUM.UPDRS4' :'4.1.Total.Hours.Awake.UPDRS4', 'NP4WDYSKPCT.UPDRS4' : 'Percent.Dyskinesia.UPDRS4','NP4OFFDEN.UPDRS4':'4.3.Total.Hours.OFF.UPDRS4', 'NP4OFFNUM.UPDRS4' : '4.3.Total.Hours.Awake.UPDRS4','NP4OFFPCT.UPDRS4' : 'Percent.OFF.UPDRS4', 'NP4DYSTNDEN.UPDRS4' :'4.6.Total.Hours.OFF.with.Dystonia.UPDRS4',	'NP4DYSTNNUM.UPDRS4':'4.6.Total.Hours.OFF.UPDRS4', 'NP4DYSTNPCT.UPDRS4':'4.6.Percent.OFF.Dystonia.UPDRS4', 'NHY.UPDRS4' : 'Hoehn.and.Yahr.Stage.UPDRS4', 'NP3BRADY.UPDRS4' : 'Global.Spontaneity.of.Movement.UPDRS4', 'NP3PTRMR.UPDRS4' : 'Postural.Tremor.Right.Hand.UPDRS4' , 'NP3PTRML.UPDRS4' : 'Postural.Tremor.Left.Hand.UPDRS4' , 'NP3KTRMR.UPDRS4' : 'Kinetic.Tremor.Right.Hand.UPDRS4', 'NP3KTRML.UPDRS4' : 'Kinetic.Tremor.Left.Hand.UPDRS4', 'NP3RTARU.UPDRS4' : 'Rest.Tremor.Amplitude.RUE.UPDRS4', 'NP3RTALU.UPDRS4' : 'Rest.Tremor.Amplitude.LUE.UPDRS4', 'NP3RTARL.UPDRS4' : 'Rest.Tremor.Amplitude.RLE.UPDRS4' ,'NP3RTALL.UPDRS4' : 'Rest.Tremor.Amplitude.LLE.UPDRS4' ,'NP3RTALJ.UPDRS4' : 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS4', 'NP3RTCON.UPDRS4' : 'Constancy.of.Rest.Tremor.UPDRS4'}, inplace = True)
 
 ## Add Brady-Rigidity, Tremor and PIGD Subscores
-# Brady-Rigidity Subscore
-brady_only = updrs_numeric[['Rigidity.Neck.UPDRS3', 'Rigidity.RUE.UPDRS3', 'Rigidity.LUE.UPDRS3', 'Rigidity.RLE.UPDRS3', 'Rigidity.LLE.UPDRS3','Rigidity.Neck.UPDRS3A','Rigidity.RUE.UPDRS3A','Rigidity.LUE.UPDRS3A', 'Rigidity.RLE.UPDRS3A', 'Rigidity.LLE.UPDRS3A', 'Rigidity.Neck.UPDR3ON' ,'Rigidity.RUE.UPDR3ON', 'Rigidity.LUE.UPDR3ON', 'Rigidity.RLE.UPDR3ON','Rigidity.LLE.UPDR3ON', 'Rigidity.Neck.UPDR3OF', 'Rigidity.RUE.UPDR3OF', 'Rigidity.LUE.UPDR3OF', 'Rigidity.RLE.UPDR3OF', 'Rigidity.LLE.UPDR3OF','Finger.Tapping.Right.Hand.UPDRS3' ,'Finger.Tapping.Left.Hand.UPDRS3' ,'Finger.Tapping.Right.Hand.UPDRS3A' ,'Finger.Tapping.Left.Hand.UPDRS3A' ,'Finger.Tapping.Right.Hand.UPDR3ON' ,'Finger.Tapping.Left.Hand.UPDR3ON' ,'Finger.Tapping.Right.Hand.UPDR3OF' ,'Finger.Tapping.Left.Hand.UPDR3OF' , 'Hand.Movements.Right.Hand.UPDRS3','Hand.Movements.Left.Hand.UPDRS3','Hand.Movements.Right.Hand.UPDRS3A', 'Hand.Movements.Left.Hand.UPDRS3A','Hand.Movements.Right.Hand.UPDR3ON','Hand.Movements.Left.Hand.UPDR3ON','Hand.Movements.Right.Hand.UPDR3OF','Hand.Movements.Left.Hand.UPDR3OF', 'Pronation.Supination.Right.Hand.UPDRS3', 'Pronation.Supination.Left.Hand.UPDRS3', 'Pronation.Supination.Right.Hand.UPDRS3A' , 'Pronation.Supination.Left.Hand.UPDRS3A' , 'Pronation.Supination.Right.Hand.UPDR3ON', 'Pronation.Supination.Left.Hand.UPDR3ON', 'Pronation.Supination.Right.Hand.UPDR3OF', 'Pronation.Supination.Left.Hand.UPDR3OF', 'Toe.Tapping.Right.Foot.UPDRS3', 'Toe.Tapping.Left.Foot.UPDRS3', 'Toe.Tapping.Right.Foot.UPDRS3A' , 'Toe.Tapping.Left.Foot.UPDRS3A', 'Toe.Tapping.Right.Foot.UPDRS3A' , 'Toe.Tapping.Left.Foot.UPDR3ON', 'Toe.Tapping.Right.Foot.UPDRS3', 'Toe.Tapping.Left.Foot.UPDR3ON','Leg.Agility.Right.Leg.UPDRS3', 'Leg.Agility.Right.Leg.UPDRS3A', 'Leg.Agility.Right.Leg.UPDR3ON', 'Leg.Agility.Right.Leg.UPDR3OF', 'Leg.Agility.Left.Leg.UPDRS3', 'Leg.Agility.Left.Leg.UPDRS3A', 'Leg.Agility.Left.Leg.UPDR3ON', 'Leg.Agility.Left.Leg.UPDR3OF']]
-updrs_numeric['Brady.Rigidity.Subscore'] = 0
-idx = brady_only.index[brady_only.isnull().all(1)]
-updrs_numeric['Brady.Rigidity.Subscore'] = brady_only.sum(axis=1)
-updrs_numeric['Brady.Rigidity.Subscore'].iloc[idx] = np.nan
+def calculate_subscores(df, new_col_name, subscore_list) : 
+    subscore_only = df[subscore_list] # extract df of only cols we are interested in for current subscore
+    df[new_col_name] = 0 # initalize new col for subscore 
+    idx = subscore_only.index[subscore_only.isnull().all(1)] # Get idx of null
+    df[new_col_name] = subscore_only.sum(axis = 1) # Get sum of subscore
+    df[new_col_name].iloc[idx] = np.nan # Replace rows that should be nan with nan 
+    return df 
 
-# Tremor Subscore 
-tremor_only = updrs_numeric[['Tremor.UPDRS2', 'Postural.Tremor.Right.Hand.UPDRS3' ,'Postural.Tremor.Left.Hand.UPDRS3' ,'Postural.Tremor.Right.Hand.UPDRS3A' ,'Postural.Tremor.Left.Hand.UPDRS3A' ,'Postural.Tremor.Right.Hand.UPDR3OF' ,'Postural.Tremor.Left.Hand.UPDR3OF' ,'Postural.Tremor.Right.Hand.UPDR3ON' ,'Postural.Tremor.Left.Hand.UPDR3ON' ,'Kinetic.Tremor.Right.Hand.UPDRS3','Kinetic.Tremor.Left.Hand.UPDRS3', 'Kinetic.Tremor.Right.Hand.UPDRS3A', 'Kinetic.Tremor.Left.Hand.UPDRS3A','Kinetic.Tremor.Right.Hand.UPDR3OF','Kinetic.Tremor.Left.Hand.UPDR3OF', 'Kinetic.Tremor.Right.Hand.UPDR3ON','Kinetic.Tremor.Left.Hand.UPDR3ON', 'Rest.Tremor.Amplitude.RUE.UPDRS3','Rest.Tremor.Amplitude.LUE.UPDRS3', 'Rest.Tremor.Amplitude.RLE.UPDRS3' , 'Rest.Tremor.Amplitude.LLE.UPDRS3' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3', 'Rest.Tremor.Amplitude.RUE.UPDRS3A', 'Rest.Tremor.Amplitude.LUE.UPDRS3A', 'Rest.Tremor.Amplitude.RLE.UPDRS3A' , 'Rest.Tremor.Amplitude.LLE.UPDRS3A' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3A', 'Rest.Tremor.Amplitude.RUE.UPDR3OF' , 'Rest.Tremor.Amplitude.LUE.UPDR3OF', 'Rest.Tremor.Amplitude.RLE.UPDR3OF' ,'Rest.Tremor.Amplitude.LLE.UPDR3OF' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDR3OF', 'Rest.Tremor.Amplitude.RUE.UPDR3ON', 'Rest.Tremor.Amplitude.LUE.UPDR3ON', 'Rest.Tremor.Amplitude.RLE.UPDR3ON' , 'Rest.Tremor.Amplitude.LLE.UPDR3ON' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDR3ON', 'Constancy.of.Rest.Tremor.UPDRS3', 'Constancy.of.Rest.Tremor.UPDRS3A', 'Constancy.of.Rest.Tremor.UPDR3OF', 'Constancy.of.Rest.Tremor.UPDR3ON']]
-updrs_numeric['Tremor.Subscore'] = 0
-idx = tremor_only.index[tremor_only.isnull().all(1)]
-updrs_numeric['Tremor.Subscore'] = tremor_only.sum(axis=1)
-updrs_numeric['Tremor.Subscore'].iloc[idx] = np.nan
-
-# PIGD subscore 
-pigd_only = updrs_numeric[['Walking.Difficulty.UPDRS2' ,  'Freezing.while.Walking.UPDRS2' ,'Gait.Problems.UPDRS3' ,'Gait.Problems.UPDRS3A' ,'Gait.Problems.UPDR3ON' , 'Gait.Problems.UPDR3OF' , 'Freezing.of.Gait.UPDRS3' ,'Freezing.of.Gait.UPDRS3A' , 'Freezing.of.Gait.UPDR3OF' , 'Freezing.of.Gait.UPDR3ON' , 'Postural.Stability.Problems.UPDRS3', 'Postural.Stability.Problems.UPDRS3A', 'Postural.Stability.Problems.UPDR3OF', 'Postural.Stability.Problems.UPDR3ON']]
-updrs_numeric['PIGD.Subscore'] = 0
-idx = pigd_only.index[pigd_only.isnull().all(1)]
-updrs_numeric['PIGD.Subscore'] = pigd_only.sum(axis=1)
-updrs_numeric['PIGD.Subscore'].iloc[idx] = np.nan
+updrs_numeric = calculate_subscores(updrs_numeric, 'Brady.Rigidity.Subscore', ['Rigidity.Neck.UPDRS3', 'Rigidity.RUE.UPDRS3', 'Rigidity.LUE.UPDRS3', 'Rigidity.RLE.UPDRS3', 'Rigidity.LLE.UPDRS3','Rigidity.Neck.UPDRS3A','Rigidity.RUE.UPDRS3A','Rigidity.LUE.UPDRS3A', 'Rigidity.RLE.UPDRS3A', 'Rigidity.LLE.UPDRS3A', 'Rigidity.Neck.UPDR3ON' ,'Rigidity.RUE.UPDR3ON', 'Rigidity.LUE.UPDR3ON', 'Rigidity.RLE.UPDR3ON','Rigidity.LLE.UPDR3ON', 'Rigidity.Neck.UPDR3OF', 'Rigidity.RUE.UPDR3OF', 'Rigidity.LUE.UPDR3OF', 'Rigidity.RLE.UPDR3OF', 'Rigidity.LLE.UPDR3OF','Finger.Tapping.Right.Hand.UPDRS3' ,'Finger.Tapping.Left.Hand.UPDRS3' ,'Finger.Tapping.Right.Hand.UPDRS3A' ,'Finger.Tapping.Left.Hand.UPDRS3A' ,'Finger.Tapping.Right.Hand.UPDR3ON' ,'Finger.Tapping.Left.Hand.UPDR3ON' ,'Finger.Tapping.Right.Hand.UPDR3OF' ,'Finger.Tapping.Left.Hand.UPDR3OF' , 'Hand.Movements.Right.Hand.UPDRS3','Hand.Movements.Left.Hand.UPDRS3','Hand.Movements.Right.Hand.UPDRS3A', 'Hand.Movements.Left.Hand.UPDRS3A','Hand.Movements.Right.Hand.UPDR3ON','Hand.Movements.Left.Hand.UPDR3ON','Hand.Movements.Right.Hand.UPDR3OF','Hand.Movements.Left.Hand.UPDR3OF', 'Pronation.Supination.Right.Hand.UPDRS3', 'Pronation.Supination.Left.Hand.UPDRS3', 'Pronation.Supination.Right.Hand.UPDRS3A' , 'Pronation.Supination.Left.Hand.UPDRS3A' , 'Pronation.Supination.Right.Hand.UPDR3ON', 'Pronation.Supination.Left.Hand.UPDR3ON', 'Pronation.Supination.Right.Hand.UPDR3OF', 'Pronation.Supination.Left.Hand.UPDR3OF', 'Toe.Tapping.Right.Foot.UPDRS3', 'Toe.Tapping.Left.Foot.UPDRS3', 'Toe.Tapping.Right.Foot.UPDRS3A' , 'Toe.Tapping.Left.Foot.UPDRS3A', 'Toe.Tapping.Right.Foot.UPDRS3A' , 'Toe.Tapping.Left.Foot.UPDR3ON', 'Toe.Tapping.Right.Foot.UPDRS3', 'Toe.Tapping.Left.Foot.UPDR3ON','Leg.Agility.Right.Leg.UPDRS3', 'Leg.Agility.Right.Leg.UPDRS3A', 'Leg.Agility.Right.Leg.UPDR3ON', 'Leg.Agility.Right.Leg.UPDR3OF', 'Leg.Agility.Left.Leg.UPDRS3', 'Leg.Agility.Left.Leg.UPDRS3A', 'Leg.Agility.Left.Leg.UPDR3ON', 'Leg.Agility.Left.Leg.UPDR3OF'])
+updrs_numeric = calculate_subscores(updrs_numeric, 'Tremor.Subscore', ['Tremor.UPDRS2', 'Postural.Tremor.Right.Hand.UPDRS3' ,'Postural.Tremor.Left.Hand.UPDRS3' ,'Postural.Tremor.Right.Hand.UPDRS3A' ,'Postural.Tremor.Left.Hand.UPDRS3A' ,'Postural.Tremor.Right.Hand.UPDR3OF' ,'Postural.Tremor.Left.Hand.UPDR3OF' ,'Postural.Tremor.Right.Hand.UPDR3ON' ,'Postural.Tremor.Left.Hand.UPDR3ON' ,'Kinetic.Tremor.Right.Hand.UPDRS3','Kinetic.Tremor.Left.Hand.UPDRS3', 'Kinetic.Tremor.Right.Hand.UPDRS3A', 'Kinetic.Tremor.Left.Hand.UPDRS3A','Kinetic.Tremor.Right.Hand.UPDR3OF','Kinetic.Tremor.Left.Hand.UPDR3OF', 'Kinetic.Tremor.Right.Hand.UPDR3ON','Kinetic.Tremor.Left.Hand.UPDR3ON', 'Rest.Tremor.Amplitude.RUE.UPDRS3','Rest.Tremor.Amplitude.LUE.UPDRS3', 'Rest.Tremor.Amplitude.RLE.UPDRS3' , 'Rest.Tremor.Amplitude.LLE.UPDRS3' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3', 'Rest.Tremor.Amplitude.RUE.UPDRS3A', 'Rest.Tremor.Amplitude.LUE.UPDRS3A', 'Rest.Tremor.Amplitude.RLE.UPDRS3A' , 'Rest.Tremor.Amplitude.LLE.UPDRS3A' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3A', 'Rest.Tremor.Amplitude.RUE.UPDR3OF' , 'Rest.Tremor.Amplitude.LUE.UPDR3OF', 'Rest.Tremor.Amplitude.RLE.UPDR3OF' ,'Rest.Tremor.Amplitude.LLE.UPDR3OF' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDR3OF', 'Rest.Tremor.Amplitude.RUE.UPDR3ON', 'Rest.Tremor.Amplitude.LUE.UPDR3ON', 'Rest.Tremor.Amplitude.RLE.UPDR3ON' , 'Rest.Tremor.Amplitude.LLE.UPDR3ON' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDR3ON', 'Constancy.of.Rest.Tremor.UPDRS3', 'Constancy.of.Rest.Tremor.UPDRS3A', 'Constancy.of.Rest.Tremor.UPDR3OF', 'Constancy.of.Rest.Tremor.UPDR3ON'])
+updrs_numeric = calculate_subscores(updrs_numeric, 'PIGD.Subscore', ['Walking.Difficulty.UPDRS2' ,  'Freezing.while.Walking.UPDRS2' ,'Gait.Problems.UPDRS3' ,'Gait.Problems.UPDRS3A' ,'Gait.Problems.UPDR3ON' , 'Gait.Problems.UPDR3OF' , 'Freezing.of.Gait.UPDRS3' ,'Freezing.of.Gait.UPDRS3A' , 'Freezing.of.Gait.UPDR3OF' , 'Freezing.of.Gait.UPDR3ON' , 'Postural.Stability.Problems.UPDRS3', 'Postural.Stability.Problems.UPDRS3A', 'Postural.Stability.Problems.UPDR3OF', 'Postural.Stability.Problems.UPDR3ON'])
 
 # Add .Num (Numeric) extension to these numeric variables
 for col_name in updrs_numeric: 
@@ -604,8 +590,7 @@ for df in [nupdrs3_copy, nupdrs3A_copy, nupdr3ON_copy, nupdr3OF_copy] :
     for col_name in nupdrs3_colname_list :
         df[col_name].replace({0 : 'None', 1 : 'Slight', 2: 'Mild', 3 : 'Moderate', 4 : 'Severe'}, inplace = True) 
     df['DBS_STATUS'].replace({0 : 'OFF', 1 : 'ON'}, inplace = True) 
-    df['DYSKPRES'].replace({0 : 'No', 1: 'Yes'}, inplace = True) 
-    df['DYSKIRAT'].replace({0: 'No', 1 : 'Yes'}, inplace = True) 
+    df = decode_0_1_no_yes(df, ['DYSKPRES','DYSKIRAT'])
     df['NHY'].replace({0 : 'Asymptomatic', 1 : 'Unilateral Movement Only', 2: 'Bilateral involvement without impairment of balance', 3 : 'Mild to moderate involvement',4: 'Severe disability', 5 : 'Wheelchair bound or bedridden'}, inplace = True) 
     df['PDTRTMNT'].replace({0 : False , 1: True}, inplace = True)
 
@@ -664,11 +649,7 @@ for col in np2_list :
 updrs_cat.rename(columns = {'UPDRS.Part2.Source' : 'UPDRS.Part2.Source.UPDRS2', 'NP2SPCH' : 'UPDRS2.Speech.Difficulty.UPDRS2' , 'NP2SALV' : 'Saliva.Drooling.UPDRS2' ,'NP2SWAL': 'Chewing.Swallowing.Difficulty.UPDRS2', 'NP2EAT' : 'Eating.Difficulty.UPDRS2', 'NP2DRES' : 'Dressing.Difficulty.UPDRS2', 'NP2HYGN' : 'Hygiene.Difficulty.UPDRS2' , 'NP2HWRT' : 'Handwriting.Difficulty.UPDRS2' ,'NP2HOBB' : 'Hobbies.Difficulty.UPDRS2' ,'NP2TURN' : 'Turning.in.Bed.Difficulty.UPDRS2', 'NP2TRMR' : 'Tremor.UPDRS2', 'NP2RISE' : 'UPDRS2.Rising.from.Chair.Difficulty.UPDRS2', 'NP2WALK' : 'Walking.Difficulty.UPDRS2' ,'NP2FREZ' : 'Freezing.while.Walking.UPDRS2' , 'NP2PTOT': 'UPDRS.Part2.Total.UPDRS2'}, inplace = True)
 
 # MDS_UPDRS Part 3 On OFF determination Dosing 
-updrs_cat['RMEXAM'].replace({0 : 'No', 1 : 'Yes'}, inplace = True)
-updrs_cat['DBSYN'].replace({0 : 'No', 1 : 'Yes'}, inplace = True)
-updrs_cat['OFFEXAM'].replace({0 : 'No', 1 : 'Yes'}, inplace = True)
-updrs_cat['OFFEXAM'].replace({0 : 'No', 1 : 'Yes'}, inplace = True)
-updrs_cat['ONEXAM'].replace({0 : 'No', 1 : 'Yes'}, inplace = True)
+updrs_cat = decode_0_1_no_yes(updrs_cat, ['RMEXAM','DBSYN', 'OFFEXAM', 'OFFEXAM', 'ONEXAM'])
 updrs_cat['RMTOFFRSN'].replace({1 : 'ON state not reached', 2 : 'Scheduling issues', 3 : 'Other reason'}, inplace = True)
 updrs_cat['ONOFFORDER'].replace({1 : 'OFF', 2 : 'ON'}, inplace = True)
 updrs_cat['RMONOFF'].replace({1 : 'OFF', 2 : 'ON'}, inplace = True)
