@@ -144,7 +144,7 @@ hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 1) & (hc_df['CONGBA'] ==
 hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 0) & (hc_df['CONGBA'] == 0) & (hc_df['CONSNCA'] == 1), 'Consensus.Subtype'] = 'SNCA'
 hc_df.loc[(hc_df['CONHC'] == 0), 'Consensus.Subtype'] = 'non-HC'  # FIXME
 
-# Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables
+# Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables for swedd df 
 swedd_df.loc[swedd_df['ENRLSWEDD'] == 1 , 'Enrollment.Subtype'] =  'SWEDD Legacy'
 swedd_df.loc[swedd_df['CONSWEDD'] == 0 , 'Consensus.Subtype'] = 'SWEDD/PD Active'
 swedd_df.loc[swedd_df['CONSWEDD'] == 1 ,'Consensus.Subtype'] =  'SWEDD/non-PD Active'
@@ -158,9 +158,7 @@ full_df['CONPROD'].replace({1 : 'Prodromal',  0 : ''}, inplace = True)
 full_df['CONHC'].replace({1 : 'Healthy Control',  0 : ''}, inplace = True) 
 full_df['CONSWEDD'].replace({1 : 'SWEDD',  0 : 'SWEDD/PD'}, inplace = True) 
 full_df['Comments'].replace({'MSA' : 'Multiple System Atrophy'}, inplace = True)
-full_df['PHENOCNV'].replace({0 : 'No', 1 : 'Yes'}, inplace = True) 
-
-# Decode and re-organize full_df
+full_df = decode_0_1_no_yes(full_df, ['PHENOCNV'])
 full_df = merge_columns(full_df, ['CONPD', 'CONPROD', 'CONHC', 'CONSWEDD'], 'Consensus.Diagnosis_temp', ', ') # Get one column for Consensus Diagnosis called Consensus.Diagnosis_temp
 full_df = merge_columns(full_df, ['Consensus.Diagnosis_temp', 'Comments'], 'Consensus.Diagnosis', ': ') # Include the 'Comments' column in with Consensus.Diagnosis_temp into a new column called 'Consensus.Diagnosis'
 full_df = merge_columns(full_df, ['Subgroup', 'Enrollment.Subtype'], 'Enroll.Subtype', '') # Get one column for Enroll.Subtype
@@ -175,7 +173,7 @@ age_df.rename(columns = {'AGE_AT_VISIT' : 'Age'}, inplace = True) # Rename colum
 ppmi_merge = pd.merge(full_df, age_df, on = 'PATNO', how = "outer") # Merge full_df with age_df
 ppmi_merge['EVENT_ID'].fillna('LOG', inplace = True) # Replace nan cells with 'LOG' in EVENT_ID column -- FIXME (not sure if I should fill this with LOG)-subject 41358 
 
-## Add birth date, sex, and handedness
+## Add deographics, vital signs, and pd diagnosis history info 
 ppmi_merge = merge_new_csv(ppmi_merge, 'Demographics.csv', ['PATNO','EVENT_ID','SEX', 'HANDED', 'BIRTHDT']) # Bday, sex, handedness
 ppmi_merge = merge_new_csv(ppmi_merge, 'Vital_Signs.csv', ['PATNO','EVENT_ID','INFODT', 'WGTKG', 'HTCM']) # Visit date, weight and height 
 ppmi_merge = merge_new_csv(ppmi_merge,  'PD_Diagnosis_History.csv', ['PATNO', 'EVENT_ID', 'SXDT','PDDXDT']) # First symptom date, PD diagnosis date 
@@ -196,11 +194,11 @@ for row_num in range(len(ppmi_merge['PD.Diagnosis.Date'])) :
 
 # Add Final (FNL) Event ID and info 
 ppmi_merge = merge_new_csv(ppmi_merge, 'Conclusion_of_Study_Participation.csv', ['PATNO', 'EVENT_ID', 'COMPLT', 'WDRSN', 'WDDT']) # completed study, whithdrawal reason, withdrawal date  
-ppmi_merge['COMPLT'].replace({0 : 'No', 1 : 'Yes'}, inplace = True) 
+ppmi_merge = decode_0_1_no_yes(ppmi_merge, ['COMPLT'])
 ppmi_merge['WDRSN'].replace({1 : 'Adverse Event', 2 : 'Completed study per protocol',3 : 'Death', 4 : 'Family, care-partner, or social issues', 5 : 'Lost to follow up', 6 : 'Non-compliance with study procedures' , 7 : 'Transportation/Travel issues' , 8 : 'Institutionalized' , 9 : 'Subject transitioning to a new cohort' , 10 : 'Subject withdrew consent', 11 : 'Investigator decision', 12 : 'Sponsor decision', 13 : 'Informant/caregiver decision' , 20 : 'Other'}, inplace = True) 
 ppmi_merge.rename(columns = {'COMPLT' : 'Completed.Study' , 'WDRSN': 'Reason.for.Withdrawal','WDDT' : 'Withdrawal.Date'}, inplace = True)
 
-## Diagnosis change - add diagnosis change info on event id 
+## Add diagnosis change info on event id 
 def condensed_df(df, keep_col_list, rename_col_dict, drop_col_list) : 
     new_df = df[keep_col_list]
     new_df.rename(columns = rename_col_dict, inplace = True)
@@ -209,7 +207,6 @@ def condensed_df(df, keep_col_list, rename_col_dict, drop_col_list) :
 
 diag_vis1 = condensed_df(full_df,['PATNO', 'DIAG1', 'DIAG1VIS'],  {'DIAG1VIS' : 'EVENT_ID'}, ['EVENT_ID'])
 diag_vis2 = condensed_df(full_df, ['PATNO', 'DIAG2', 'DIAG2VIS'],  {'DIAG2VIS' : 'EVENT_ID'},['EVENT_ID'])
-
 ppmi_merge.drop(['DIAG1', 'DIAG1VIS', 'DIAG2', 'DIAG2VIS'], axis = 1, inplace = True) # Drop these from ppmi_merge so there aren't duplicates when we merge the diag_vis dfs
 ppmi_merge = pd.merge(diag_vis1, ppmi_merge, on = ['EVENT_ID', 'PATNO'], how = "outer" ) # Merge in first diagnosis change
 ppmi_merge = pd.merge(diag_vis2, ppmi_merge, on = ['EVENT_ID', 'PATNO'], how = "outer" ) # Merge in second diagnosis change
@@ -217,8 +214,8 @@ ppmi_merge['DIAG1'].replace({ 'PD' : 'Parkinson\'s Disease', 'DLB': 'Dimentia wi
 ppmi_merge['DIAG2'].replace({ 'MSA' : 'Multiple System Atrophy', 'DLB': 'Dimentia with Lewy Bodies'}, inplace = True) # Decode
 ppmi_merge.rename(columns = {'DIAG1' : 'First.Diagnosis.Change', 'DIAG2' : 'Second.Diagnosis.Change'}, inplace = True) # Rename columns
 
-## Dominant side of disease (DOMSIDE) 
-ppmi_merge = merge_new_csv(ppmi_merge, 'PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv',['PATNO', 'EVENT_ID', 'DOMSIDE']) # Visit date, weight and height 
+## Dominant side of disease
+ppmi_merge = merge_new_csv(ppmi_merge, 'PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv',['PATNO', 'EVENT_ID', 'DOMSIDE']) # Domside
 ppmi_merge['DOMSIDE'].replace({1 : 'Left', 2 : 'Right', 3 : 'Symmetric'}, inplace = True) # Decode 
 
 ## Participant Motor Function Questionnaire 
@@ -249,8 +246,7 @@ med_df['STARTDT'].fillna('NA', inplace = True) # Fillna
 med_df['STOPDT'].fillna('NA', inplace = True) # Fillna
 med_df = med_df.astype({"STARTDT" : 'str', "STOPDT" :'str'}) # Change start and stop date to strings
 med_df = merge_columns(med_df, ['STARTDT', 'STOPDT'], 'Start_Stop', '-') # Merge columns Start and stop date together 
-for index in med_df['Start_Stop'].index : 
-    med_df['Start_Stop'].iloc[index] = '(' + med_df['Start_Stop'][index] + ')' # Put parenthesis around dates so when you merge it with LED_med_and dose it is more organized
+med_df['Start_Stop'] = '(' + med_df['Start_Stop'].astype(str) + ')'# Put parenthesis around dates so when you merge it with LED_med_and dose it is more organized
 med_df = merge_columns(med_df, ['CMTRT', 'Start_Stop'], 'Medication', ' ')
 med_df = med_df.groupby(['PATNO','EVENT_ID'])['Medication'].apply('; '.join)
 ppmi_merge = pd.merge(ppmi_merge, med_df, on = ['PATNO', 'EVENT_ID'], how = "outer") # Merge med_df in 
@@ -262,25 +258,35 @@ LEDD_med_df = LEDD_med_df[['PATNO', 'LEDD', 'STARTDT', 'STOPDT']]
 ppmi_merge['INFODT'] = pd.to_datetime(ppmi_merge['INFODT'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
 LEDD_med_df['STARTDT'] = pd.to_datetime(LEDD_med_df['STARTDT'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
 LEDD_med_df['STOPDT'] = pd.to_datetime(LEDD_med_df['STOPDT'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
-
-# Fill in NaN stop dates with start dates 
 LEDD_med_df['STOPDT2'] = LEDD_med_df['STOPDT'] # Initialize second stop date variable
-for i in range(len(LEDD_med_df['STOPDT'])) : 
-    if isNaN(LEDD_med_df['STOPDT'].iloc[i]) : 
-        LEDD_med_df['STOPDT2'].iloc[i] = LEDD_med_df['STARTDT'].iloc[i]
-
-# Create a row for every month/year for LEDD 
-LEDD_med_df = LEDD_med_df.merge(LEDD_med_df.apply(lambda s: pd.date_range(s.STARTDT, s.STOPDT2, freq='MS', inclusive = 'both'), 1)\
-                   .explode()\
-                   .rename('INFODT')\
-                   .dt.strftime('%m/%Y'),
-                 left_index=True, 
-                 right_index=True)
-
-# Merge into ppmi_merge
+LEDD_med_df['STOPDT2'].fillna(LEDD_med_df['STARTDT'], inplace = True)# Fill in NaN stop dates with start dates 
+LEDD_med_df = LEDD_med_df.merge(LEDD_med_df.apply(lambda s: pd.date_range(s.STARTDT, s.STOPDT2, freq='MS', inclusive = 'both'), 1).explode().rename('INFODT').dt.strftime('%m/%Y'), left_index=True, right_index=True) # Create a row for every month/year for LEDD 
 LEDD_med_df.drop(['STOPDT2'], axis = 1, inplace = True)
 LEDD_med_df.rename(columns = {'STARTDT' : 'LEDD.STARTDT', 'STOPDT': 'LEDD.STOPDT'}, inplace = True) # Rename 
-ppmi_merge = pd.merge(ppmi_merge, LEDD_med_df, on = ['PATNO','INFODT'], how = "left")
+
+# If one event id has > 1 LEDD - take max LEDD only 
+ppmi_merge_temp = ppmi_merge[['PATNO', 'EVENT_ID', 'INFODT']]
+ppmi_merge_temp = pd.merge(ppmi_merge_temp, LEDD_med_df, on = ['PATNO', 'INFODT'], how = "left")
+ppmi_merge_temp = ppmi_merge_temp[['PATNO', 'EVENT_ID', 'LEDD', 'LEDD.STARTDT', 'LEDD.STOPDT']] # keep only 
+ppmi_merge_temp = ppmi_merge_temp[ppmi_merge_temp["LEDD"].str.contains("LD") == False] # FIXME not sure what to do with LD x .33 etc rows - for now remove 
+uids = ppmi_merge_temp['PATNO'].unique() # Unique subject ids
+myevs = ppmi_merge_temp['EVENT_ID'].unique() # Unique event ids
+ppmi_merge_temp['LEDD2'] = False
+for myev in myevs : 
+    for u in uids :
+        selu = ppmi_merge_temp.loc[(ppmi_merge_temp['PATNO'] == u) & (ppmi_merge_temp['EVENT_ID'] == myev) & (ppmi_merge_temp['LEDD'].notna())]
+        if len(selu) == 1: 
+            idx = selu.index
+            ppmi_merge_temp.loc[idx, 'LEDD2'] = True
+        if len(selu) > 1 : 
+            selu['LEDD'] = selu['LEDD'].astype(float)
+            maxidx = selu.LEDD.idxmax()
+            ppmi_merge_temp.loc[maxidx, 'LEDD2'] = True
+        
+ledd_keep = ppmi_merge_temp['LEDD2'] == True
+LEDD_new_df = ppmi_merge_temp[ledd_keep]
+LEDD_new_df.drop(['LEDD2'], axis = 1, inplace = True)
+ppmi_merge = pd.merge(ppmi_merge, LEDD_new_df, on = ['PATNO','EVENT_ID'], how = "left") # Merge into ppmi_merge
 
 ## Comorbidities
 comorbid_df = pd.read_csv(ppmi_download_path + 'Medical_Conditions_Log.csv', skipinitialspace=True) # Medication history 
@@ -288,15 +294,13 @@ comorbid_df.replace({';' : ','}, regex = True, inplace = True) # Replace ';' wit
 comorbid_df = comorbid_df[['PATNO', 'EVENT_ID', 'MHDIAGDT','MHTERM']] # keep only 
 comorbid_df['MHTERM'] = comorbid_df['MHTERM'].str.capitalize() # Capitalize all MHTERM names 
 comorbid_df['MHDIAGDT'].fillna('NA', inplace = True) # If no diagnosis date - fill in with NA
-for row_num in range(len(comorbid_df['MHDIAGDT'])) : 
-    comorbid_df['MHDIAGDT'].iloc[row_num] = '(' + comorbid_df['MHDIAGDT'][row_num] + ')' # Put parentheses around diagnosis date 
+comorbid_df['MHDIAGDT'] = '(' + comorbid_df['MHDIAGDT'].astype(str) + ')'# Put parentheses around diagnosis date 
 comorbid_df = comorbid_df.astype({"MHDIAGDT" : 'str'}) # Change date to string
 comorbid_df = merge_columns(comorbid_df, ['MHTERM', 'MHDIAGDT'], 'Medical.History.Description(Diagnosis.Date)' , ' ')
 comorbid_df = comorbid_df.groupby(['PATNO','EVENT_ID'])['Medical.History.Description(Diagnosis.Date)'].apply('; '.join)
 ppmi_merge = pd.merge(ppmi_merge, comorbid_df, on = ['PATNO','EVENT_ID'], how = "outer")
 
-## Education (in years)
-# FIXME make integer
+## Education (in years)- FIXME make integer
 education_df = pd.read_csv(ppmi_download_path + 'Socio-Economics.csv', skipinitialspace = True) # Education info 
 education_df = education_df[['PATNO', 'EVENT_ID', 'EDUCYRS']] # Keep info 
 education_df.rename(columns = {'EDUCYRS' : 'Education.Years'}, inplace = True) # Rename 
@@ -329,12 +333,12 @@ ppmi_merge['REM.Sleep.Behavior.Disorder.Page.Name'].replace({'REMSLEEP' : 'REM S
 ppmi_merge['PTCGBOTH'].replace({1 : 'Participant', 2 : 'Caregiver', 3: 'Participant and Caregiver'}, inplace = True)
 rem_list = ['DRMVIVID',	'DRMAGRAC',	'DRMNOCTB',	'SLPLMBMV',	'SLPINJUR',	'DRMVERBL',	'DRMFIGHT',	'DRMUMV',	'DRMOBJFL',	'MVAWAKEN',	'DRMREMEM',	'SLPDSTRB',	'STROKE',	'HETRA',	'PARKISM',	'RLS','NARCLPSY',	'DEPRS',	'EPILEPSY',	'BRNINFM',	'CNSOTH']
 ppmi_merge['RBDTotal.REM'] = ppmi_merge[rem_list].sum(axis = 1) # Add an RBDTotal.REM column
-ppmi_merge = decode_0_1_no_yes(ppmi_merge,rem_list)
+ppmi_merge = decode_0_1_no_yes(ppmi_merge, rem_list)
 ppmi_merge.rename(columns = {'PTCGBOTH' : 'Sleep.Behavior.Source.REM','DRMVIVID' : 'Vivid.Dreams.REM' , 'DRMAGRAC': 'Aggressive.or.Action-packed.Dreams.REM',	'DRMNOCTB':'Nocturnal.Behaviour.REM','SLPLMBMV':'Move.Arms/legs.During.Sleep.REM', 'SLPINJUR':'Hurt.Bed.Partner.REM',	'DRMVERBL':'Speaking.in.Sleep.REM',	'DRMFIGHT': 'Sudden.Limb.Movements.REM',	'DRMUMV':'Complex.Movements.REM',	'DRMOBJFL':'Things.Fell.Down.REM',	'MVAWAKEN':'My.Movements.Awake.Me.REM',	'DRMREMEM':'Remember.Dreams.REM',	'SLPDSTRB':'Sleep.is.Disturbed.REM',	'STROKE':'Stroke.REM',	'HETRA':'Head.Trauma.REM',	'PARKISM':'Parkinsonism.REM',	'RLS':'RLS.REM',	'NARCLPSY':'Narcolepsy.REM',	'DEPRS':'Depression.REM',	'EPILEPSY':'Epilepsy.REM',	'BRNINFM':'Inflammatory.Disease.of.the.Brain.REM',	'CNSOTH':'Other.REM'}, inplace = True)
 
 
 #### IMAGING INFO ####
-## DATSCAN
+# FIXME - laterality issue?  SUV ?
 ppmi_merge = merge_new_csv(ppmi_merge,'DaTScan_Analysis.csv', ['PATNO','EVENT_ID','DATSCAN_DATE','DATSCAN_CAUDATE_R','DATSCAN_CAUDATE_L','DATSCAN_PUTAMEN_R','DATSCAN_PUTAMEN_L','DATSCAN_ANALYZED','DATSCAN_NOT_ANALYZED_REASON'])
 ppmi_merge = merge_new_csv(ppmi_merge,'DaTScan_Imaging.csv', ['PATNO','EVENT_ID','PAG_NAME','INFODT','DATSCAN','PREVDATDT','SCNLOC','SCNINJCT','VSINTRPT','VSRPTELG'])
 ppmi_merge['DATSCAN'].replace({0 : 'Not Completed', 1: 'Completed', 2 : 'Completed using a previously acquired DaTscan (i.e., acquired prior to participant\'s consent to PPMI)' }, inplace = True)
@@ -343,11 +347,7 @@ ppmi_merge['SCNINJCT'].replace({ 1 : 'DaTSCAN', 2 : 'Beta-CIT'}, inplace = True)
 ppmi_merge['VSINTRPT'].replace({ '1' : 'Consistent with evidence' , '2' : 'Not consistent with evidence', '3' : 'No visual interpretation report provided'}, inplace = True)
 ppmi_merge['VSRPTELG'].replace({1 : 'Eligible', 2 : 'Not eligible'}, inplace = True)
 ppmi_merge.rename(columns = {'INFODT_x' : 'INFODT', 'INFODT_y' : 'DaTScan.INFODT', 'SCNLOC' : 'Location.Scan.Completed' , 'PREVDATDT' : 'Date.DaTscan.Imaging.Completed.Previously', 'SCNINJCT' : 'Scan.Injection', 'VSINTRPT' : 'Visual.Interpretation.Report', 'VSRPTELG' : 'Visual.Interpretation.Report(eligible/not)'}, inplace = True)
-
-## If INFODT in ppmi_merge is NAN - fill in with DaTScan.INFODT  
-for i in range(len(ppmi_merge['INFODT'])) : 
-    if isNaN(ppmi_merge['INFODT'].iloc[i]) : 
-        ppmi_merge['INFODT'].iloc[i] = ppmi_merge['DaTScan.INFODT'].iloc[i]
+ppmi_merge['INFODT'].fillna(ppmi_merge['DaTScan.INFODT'], inplace = True)# Fill in NaN infodts with datscan infodts if na  
 
 ## MRI.csv
 mri_df = pd.read_csv(ppmi_download_path + 'Magnetic_Resonance_Imaging__MRI_.csv', skipinitialspace=True)
@@ -412,8 +412,7 @@ for row_num in range(len(s3_df['T1.s3.Image.Name'])) :
 ppmi_merge = pd.merge(ppmi_merge, s3_df, on = ['PATNO','EVENT_ID'], how = "outer")
 
 
-#### MDS-UPDRS Scores ####
-#### UPDRS 1-4 as Numeric Variables ####
+#### MDS-UPDRS Scores UPDRS 1-4 as Numeric Variables ####
 def setup_updrs_df(updrs_filename, drop_cols, decode_dict, rename_col_dict) : 
     updrs_df = pd.read_csv(ppmi_download_path + updrs_filename, skipinitialspace = True) 
     updrs_df.drop(drop_cols, axis = 1, inplace = True)
@@ -457,13 +456,16 @@ updrs_part3_dos_df_copy = updrs_part3_dos_df.copy()
 updrs_part4_motor_df_copy = updrs_part4_motor_df.copy()
 
 # For all UPDRS df columns - add the respective extension for which UPDRS assessment it is 
-updrs_list_str = ['.UPDRS1','.UPDRS1','.UPDRS2', '.UPDRS3','.UPDRS3A', '.UPDR3OF', '.UPDR3ON','.UPDRDOSE','.UPDRS4'] # extensions
-count = 0 
-for df in updrs_list : 
+def add_extension_to_column_names(df, skip_col_list, ext): 
     for col_name in df : 
-        if col_name != 'PATNO' and col_name != 'EVENT_ID' and col_name != 'INFODT': 
-            df.rename(columns = {str(col_name) : str(col_name) + (updrs_list_str[count])}, inplace = True) # Add extension
-    count += 1 
+        if col_name not in skip_col_list : 
+            df.rename(columns = {str(col_name) : str(col_name) + ext }, inplace = True) 
+    return df 
+
+# Add extensions to updrs dfs 
+updrs_list_str = ['.UPDRS1','.UPDRS1','.UPDRS2', '.UPDRS3','.UPDRS3A', '.UPDR3OF', '.UPDR3ON','.UPDRDOSE','.UPDRS4'] # extensions
+for i in range(len(updrs_list)) : 
+    updrs_list[i] = add_extension_to_column_names(updrs_list[i], ['PATNO','EVENT_ID','INFODT'], updrs_list_str[i])
 
 # Merge the four UPDRS3 dfs together 
 updrs3 = pd.merge(nupdrs3, nupdrs3A, on = ['PATNO', 'EVENT_ID'], how = "outer")
@@ -499,18 +501,12 @@ def calculate_subscores(df, new_col_name, subscore_list) :
 updrs_numeric = calculate_subscores(updrs_numeric, 'Brady.Rigidity.Subscore', ['Rigidity.Neck.UPDRS3', 'Rigidity.RUE.UPDRS3', 'Rigidity.LUE.UPDRS3', 'Rigidity.RLE.UPDRS3', 'Rigidity.LLE.UPDRS3','Rigidity.Neck.UPDRS3A','Rigidity.RUE.UPDRS3A','Rigidity.LUE.UPDRS3A', 'Rigidity.RLE.UPDRS3A', 'Rigidity.LLE.UPDRS3A', 'Rigidity.Neck.UPDR3ON' ,'Rigidity.RUE.UPDR3ON', 'Rigidity.LUE.UPDR3ON', 'Rigidity.RLE.UPDR3ON','Rigidity.LLE.UPDR3ON', 'Rigidity.Neck.UPDR3OF', 'Rigidity.RUE.UPDR3OF', 'Rigidity.LUE.UPDR3OF', 'Rigidity.RLE.UPDR3OF', 'Rigidity.LLE.UPDR3OF','Finger.Tapping.Right.Hand.UPDRS3' ,'Finger.Tapping.Left.Hand.UPDRS3' ,'Finger.Tapping.Right.Hand.UPDRS3A' ,'Finger.Tapping.Left.Hand.UPDRS3A' ,'Finger.Tapping.Right.Hand.UPDR3ON' ,'Finger.Tapping.Left.Hand.UPDR3ON' ,'Finger.Tapping.Right.Hand.UPDR3OF' ,'Finger.Tapping.Left.Hand.UPDR3OF' , 'Hand.Movements.Right.Hand.UPDRS3','Hand.Movements.Left.Hand.UPDRS3','Hand.Movements.Right.Hand.UPDRS3A', 'Hand.Movements.Left.Hand.UPDRS3A','Hand.Movements.Right.Hand.UPDR3ON','Hand.Movements.Left.Hand.UPDR3ON','Hand.Movements.Right.Hand.UPDR3OF','Hand.Movements.Left.Hand.UPDR3OF', 'Pronation.Supination.Right.Hand.UPDRS3', 'Pronation.Supination.Left.Hand.UPDRS3', 'Pronation.Supination.Right.Hand.UPDRS3A' , 'Pronation.Supination.Left.Hand.UPDRS3A' , 'Pronation.Supination.Right.Hand.UPDR3ON', 'Pronation.Supination.Left.Hand.UPDR3ON', 'Pronation.Supination.Right.Hand.UPDR3OF', 'Pronation.Supination.Left.Hand.UPDR3OF', 'Toe.Tapping.Right.Foot.UPDRS3', 'Toe.Tapping.Left.Foot.UPDRS3', 'Toe.Tapping.Right.Foot.UPDRS3A' , 'Toe.Tapping.Left.Foot.UPDRS3A', 'Toe.Tapping.Right.Foot.UPDRS3A' , 'Toe.Tapping.Left.Foot.UPDR3ON', 'Toe.Tapping.Right.Foot.UPDRS3', 'Toe.Tapping.Left.Foot.UPDR3ON','Leg.Agility.Right.Leg.UPDRS3', 'Leg.Agility.Right.Leg.UPDRS3A', 'Leg.Agility.Right.Leg.UPDR3ON', 'Leg.Agility.Right.Leg.UPDR3OF', 'Leg.Agility.Left.Leg.UPDRS3', 'Leg.Agility.Left.Leg.UPDRS3A', 'Leg.Agility.Left.Leg.UPDR3ON', 'Leg.Agility.Left.Leg.UPDR3OF'])
 updrs_numeric = calculate_subscores(updrs_numeric, 'Tremor.Subscore', ['Tremor.UPDRS2', 'Postural.Tremor.Right.Hand.UPDRS3' ,'Postural.Tremor.Left.Hand.UPDRS3' ,'Postural.Tremor.Right.Hand.UPDRS3A' ,'Postural.Tremor.Left.Hand.UPDRS3A' ,'Postural.Tremor.Right.Hand.UPDR3OF' ,'Postural.Tremor.Left.Hand.UPDR3OF' ,'Postural.Tremor.Right.Hand.UPDR3ON' ,'Postural.Tremor.Left.Hand.UPDR3ON' ,'Kinetic.Tremor.Right.Hand.UPDRS3','Kinetic.Tremor.Left.Hand.UPDRS3', 'Kinetic.Tremor.Right.Hand.UPDRS3A', 'Kinetic.Tremor.Left.Hand.UPDRS3A','Kinetic.Tremor.Right.Hand.UPDR3OF','Kinetic.Tremor.Left.Hand.UPDR3OF', 'Kinetic.Tremor.Right.Hand.UPDR3ON','Kinetic.Tremor.Left.Hand.UPDR3ON', 'Rest.Tremor.Amplitude.RUE.UPDRS3','Rest.Tremor.Amplitude.LUE.UPDRS3', 'Rest.Tremor.Amplitude.RLE.UPDRS3' , 'Rest.Tremor.Amplitude.LLE.UPDRS3' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3', 'Rest.Tremor.Amplitude.RUE.UPDRS3A', 'Rest.Tremor.Amplitude.LUE.UPDRS3A', 'Rest.Tremor.Amplitude.RLE.UPDRS3A' , 'Rest.Tremor.Amplitude.LLE.UPDRS3A' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3A', 'Rest.Tremor.Amplitude.RUE.UPDR3OF' , 'Rest.Tremor.Amplitude.LUE.UPDR3OF', 'Rest.Tremor.Amplitude.RLE.UPDR3OF' ,'Rest.Tremor.Amplitude.LLE.UPDR3OF' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDR3OF', 'Rest.Tremor.Amplitude.RUE.UPDR3ON', 'Rest.Tremor.Amplitude.LUE.UPDR3ON', 'Rest.Tremor.Amplitude.RLE.UPDR3ON' , 'Rest.Tremor.Amplitude.LLE.UPDR3ON' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDR3ON', 'Constancy.of.Rest.Tremor.UPDRS3', 'Constancy.of.Rest.Tremor.UPDRS3A', 'Constancy.of.Rest.Tremor.UPDR3OF', 'Constancy.of.Rest.Tremor.UPDR3ON'])
 updrs_numeric = calculate_subscores(updrs_numeric, 'PIGD.Subscore', ['Walking.Difficulty.UPDRS2' ,  'Freezing.while.Walking.UPDRS2' ,'Gait.Problems.UPDRS3' ,'Gait.Problems.UPDRS3A' ,'Gait.Problems.UPDR3ON' , 'Gait.Problems.UPDR3OF' , 'Freezing.of.Gait.UPDRS3' ,'Freezing.of.Gait.UPDRS3A' , 'Freezing.of.Gait.UPDR3OF' , 'Freezing.of.Gait.UPDR3ON' , 'Postural.Stability.Problems.UPDRS3', 'Postural.Stability.Problems.UPDRS3A', 'Postural.Stability.Problems.UPDR3OF', 'Postural.Stability.Problems.UPDR3ON'])
-
-# Add .Num (Numeric) extension to these numeric variables
-for col_name in updrs_numeric: 
-    if col_name != 'PATNO' and col_name != 'EVENT_ID' and col_name != 'PIGD.Subscore' and col_name != 'Tremor.Subscore' and col_name != 'Brady.Rigidity.Subscore' : 
-        updrs_numeric.rename(columns = {str(col_name) : str(col_name) + '.Num'}, inplace = True) # Add .Num extension
+updrs_numeric2 = add_extension_to_column_names(updrs_numeric, ['PATNO', 'EVENT_ID', 'PIGD.Subscore', 'Tremor.Subscore', 'Brady.Rigidity.Subscore'], '.Num') # Add a .Num extension to column names w updrs numeric vars 
 
 ### UPDRS CATEGORICAL ####
 # UPDRS3 (four dataframes) decode and rename in loop
 updrs3_df_list = [nupdrs3_copy, nupdrs3A_copy, nupdr3ON_copy, nupdr3OF_copy]
 ext_list = ['.UPDRS3', '.UPDRS3A', '.UPDR3ON', '.UPDR3OF']
-
-# Decode, rename columns and add extension for updrs3 dfs in updrs3_df_list 
 count = 0
 for df in [nupdrs3_copy, nupdrs3A_copy, nupdr3ON_copy, nupdr3OF_copy] : 
     df = decode_none2severe(df, ['NP3SPCH', 'NP3FACXP', 'NP3RIGN', 'NP3RIGRU', 'NP3RIGLU', 'NP3RIGRL', 'NP3RIGLL', 'NP3FTAPR', 'NP3FTAPL', 'NP3HMOVR', 'NP3HMOVL', 'NP3PRSPR', 'NP3PRSPL', 'NP3TTAPR', 'NP3TTAPL', 'NP3LGAGR', 'NP3LGAGL', 'NP3RISNG', 'NP3GAIT', 'NP3FRZGT', 'NP3PSTBL', 'NP3POSTR', 'NP3BRADY', 'NP3PTRMR', 'NP3PTRML', 'NP3KTRMR', 'NP3KTRML', 'NP3RTARU', 'NP3RTALU', 'NP3RTARL', 'NP3RTALL', 'NP3RTALJ', 'NP3RTCON'])
@@ -518,13 +514,8 @@ for df in [nupdrs3_copy, nupdrs3A_copy, nupdr3ON_copy, nupdr3OF_copy] :
     df = decode_0_1_no_yes(df, ['DYSKPRES','DYSKIRAT'])
     df['NHY'].replace({0 : 'Asymptomatic', 1 : 'Unilateral Movement Only', 2: 'Bilateral involvement without impairment of balance', 3 : 'Mild to moderate involvement',4: 'Severe disability', 5 : 'Wheelchair bound or bedridden'}, inplace = True) 
     df['PDTRTMNT'].replace({0 : False , 1: True}, inplace = True)
-
-    # Rename columns
     df.rename(columns = {'DBS_STATUS' : 'Deep.Brain.Stimulation.Treatment' , 'NP3SPCH' : 'UPDRS3.Speech.Difficulty', 'NP3FACXP' : 'Facial.Expression.Difficulty' , 'NP3RIGN' : 'Rigidity.Neck' , 'NP3RIGRU' : 'Rigidity.RUE', 'NP3RIGLU' : 'Rigidity.LUE', 'NP3RIGRL' : 'Rigidity.RLE', 'NP3RIGLL' : 'Rigidity.LLE', 'NP3FTAPR' : 'Finger.Tapping.Right.Hand' ,'NP3FTAPL' : 'Finger.Tapping.Left.Hand' ,'NP3HMOVR' : 'Hand.Movements.Right.Hand', 'NP3HMOVL' : 'Hand.Movements.Left.Hand','NP3PRSPR' : 'Pronation.Supination.Right.Hand', 'NP3PRSPL' : 'Pronation.Supination.Left.Hand' , 'NP3TTAPR' : 'Toe.Tapping.Right.Foot' , 'NP3TTAPL' : 'Toe.Tapping.Left.Foot', 'NP3LGAGR' : 'Leg.Agility.Right.Leg', 'NP3LGAGL' : 'Leg.Agility.Left.Leg', 'NP3RISNG' : 'UPDRS3.Rising.from.Chair', 'NP3GAIT' : 'Gait.Problems' ,'NP3FRZGT' : 'Freezing.of.Gait' ,'NP3PSTBL' : 'Postural.Stability.Problems', 'NP3POSTR' : 'Posture.Problems' , 'NP3TOT':'UPDRS.Part3.Total', 'RMONOFF' : 'MDS-UPDRS.Part3.Remote.Visit.ON.or.OFF',  'Most.Recent.PD.Med.Dose.Date.Time.Before.OFF.Exam' : 'Most.Recent.PD.Med.Dose.Date.Time.Before.OFF.Exam', 'RMTOFFRSN' : 'Reason.OFF.Exam.at.Remote.Visit',  'ONEXAM' : 'ON.Exam.Performed' ,'ONEXAMTM' : 'ON.Exam.Time', 'ONNORSN' : 'Reason.ON.Exam.Not.Performed' , 'ONOFFORDER' : 'ON.or.OFF.Exam.Performed.First' , 'Most.Recent.PD.Med.Dose.Date.Time.Before.ON.Exam' :'Most.Recent.PD.Med.Dose.Date.Time.Before.ON.Exam', 'PDMEDYN' : 'On.PD.Medication', 'DBSONTM' : 'Time.DBS.Turned.on.before.ON.Exam', 'DBSOFFTM' : 'Time.DBS.Turned.off.before.OFF.Exam', 'OFFNORSN' : 'Reason.OFF.Exam.Not.Performed' , 'OFFEXAM' : 'OFF.Exam.Performed', 'OFFEXAMTM' : 'OFF.Exam.Time', 'DBSYN' : 'Has.DBS', 'HRPOSTMED' : 'Hours.btwn.PD.Med.and.UPDRS3.Exam', 'HRDBSOFF' : 'Hours.btwn.DBS.Device.Off.and.UPDRS3.Exam', 'HRDBSON' : 'Hours.btwn.DBS.Device.On.and.UPDRS3.Exam' , 'RMEXAM' : 'Remote.UPDRS3.Exam','DYSKPRES' : 'Dyskinesias.Present', 'DYSKIRAT' : 'Movements.Interefered.with.Ratings', 'NHY' : 'Hoehn.and.Yahr.Stage', 'PDTRTMNT' : 'On.PD.Treatment','NP3BRADY' : 'Global.Spontaneity.of.Movement', 'NP3PTRMR' : 'Postural.Tremor.Right.Hand' , 'NP3PTRML' : 'Postural.Tremor.Left.Hand' , 'NP3KTRMR' : 'Kinetic.Tremor.Right.Hand', 'NP3KTRML' : 'Kinetic.Tremor.Left.Hand', 'NP3RTARU' : 'Rest.Tremor.Amplitude.RUE', 'NP3RTALU' : 'Rest.Tremor.Amplitude.LUE', 'NP3RTARL' : 'Rest.Tremor.Amplitude.RLE' ,'NP3RTALL' : 'Rest.Tremor.Amplitude.LLE' ,'NP3RTALJ' : 'Rest.Tremor.Amplitude.Lip.Jaw', 'NP3RTCON' : 'Constancy.of.Rest.Tremor', 'PDSTATE' : 'Functional.State','EXAMTM' : 'UPDRS.Part3.Exam.Time' }, inplace = True)
-    
-    for col in df : 
-        if col != 'PATNO' and col != 'EVENT_ID' and col != 'INFODT' :  
-            df.rename(columns = {str(col) : str(col) + ext_list[count]}, inplace = True) # Add extension
+    df = add_extension_to_column_names(df, ['PATNO','EVENT_ID','INFODT'], ext_list[count])
     count += 1
 
 # Combine pd med dose date and time into one column
@@ -588,11 +579,7 @@ updrs_cat['NP4DYSTN'].replace({0 : 'No dystonia', 1: 'Slight: <= 25% of time in 
 updrs_cat['NP4FLCTX'].replace({0: 'Normal', 1 : 'Slight', 2: 'Mild', 3 : 'Moderate', 4 : 'Severe'}, inplace = True) 
 updrs_cat['RMNOPRT3'].replace({1 : 'Visit was not conducted with video', 2 : 'Scheduling issues', 3: 'Other reason'}, inplace = True)
 updrs_cat.rename(columns = {'RMNOPRT3': 'Reason.UPDRSPart3.Not.Administered.Remote.Visit.UPDRDOSE','NP4WDYSKDEN':'4.1.Time.with.Dyskinesias.UPDRS4', 'NP4WDYSKNUM' :'4.1.Total.Hours.Awake.UPDRS4', 'NP4WDYSKPCT' : 'Percent.Dyskinesia.UPDRS4','NP4OFFDEN':'4.3.Total.Hours.OFF.UPDRS4', 'NP4OFFNUM' : '4.3.Total.Hours.Awake.UPDRS4','NP4OFFPCT' : 'Percent.OFF.UPDRS4', 'NP4DYSTNDEN' :'4.6.Total.Hours.OFF.with.Dystonia.UPDRS4',	'NP4DYSTNNUM':'4.6.Total.Hours.OFF.UPDRS4', 'NP4DYSTNPCT':'4.6.Percent.OFF.Dystonia.UPDRS4', 'NP4WDYSK' : 'Time.Spent.with.Dyskinesias.UPDRS4', 'NP4DYSKI':'Functional.Impact.of.Dyskinesias.UPDRS4','NP4OFF' : 'Time.Spent.in.OFF.State.UPDRS4', 	'NP4FLCTI':'Functional.Impact.Fluctuations.UPDRS4',	'NP4FLCTX':'Complexity.of.Motor.Fluctuations.UPDRS4' ,	'NP4DYSTN':'Painful.OFF-state.Dystonia.UPDRS4' ,'NP4TOT': 'UPDRS.Part4.Total.UPDRS4','NP4WDYSKDEN' : '4.1.Total.Hours.with.Dyskinesia', 'NP4WDYSKNUM' : '4.1.Total.Hours.Awake', 'NP4WDYSKPCT' : '4.1.%.Dyskinesia',  'NP4OFFDEN' :'4.3.Total.Hours.OFF' , 'NP4OFFNUM' :'4.3.Total.Hours.Awake' , 'NP4OFFPCT': '4.3.%.OFF', 'NP4DYSTNDEN' : '4.6.Total.Hours.OFF.with.Dystonia', 'NP4DYSTNNUM' :'4.6.Total.Hours.OFF', 'NP4DYSTNPCT' : '4.6.%.OFF.Dystonia' ,'NP4DYSTNPCT' :'4.6.%.OFF.Dystonia'}, inplace = True)
-
-# Add .Cat extensino to updrs_cat col names
-for col in updrs_cat: 
-    if col != 'PATNO' and col != 'EVENT_ID' and col != 'INFODT': 
-        updrs_cat.rename(columns = {str(col) : str(col) + '.Cat'}, inplace = True)
+updrs_cat = add_extension_to_column_names(updrs_cat, ['PATNO', 'EVENT_ID', 'INFODT'], '.Cat') # Add a .Cat extension to column names w updrs cat vars 
 
 # Create one df with UPDRS scores .Num (numeric) and all UPDRS scores .Cat (categorical)
 updrs_cat.drop(['INFODT'], axis = 1, inplace = True)
@@ -755,7 +742,6 @@ def add_lateralized_subscores(df : pd.DataFrame, subscore_side_list : list, side
     new_col_name : name of new column name with lateralized subscore 
 
     """
-
     subscore_side = df[subscore_side_list]  # Get dataframe of only columns in brady_left
     df[new_col_name] = 0 # Initialize lateralized variable
     subscore_side.loc[subscore_side['Dominant.Side.Disease'] != side, :] = np.nan # Make all rows nan if dominant side of disease is not left 
@@ -768,10 +754,10 @@ def add_lateralized_subscores(df : pd.DataFrame, subscore_side_list : list, side
 
     elif side == 'Symmetric': 
         x = subscore_side_temp.fillna(0) # because adding 1 plus nan equals nan
-        if new_col_name.contains("Brady") :  
+        if "Brady" in new_col_name :  
             df[new_col_name] = x['Rigidity.Neck.UPDRS3.Num'] + (x['Rigidity.RUE.UPDRS3.Num'] + x['Rigidity.LUE.UPDRS3.Num'])/2 + (x['Rigidity.RLE.UPDRS3.Num'] + x['Rigidity.LLE.UPDRS3.Num'])/2  + x['Rigidity.Neck.UPDRS3A.Num']+ (x['Rigidity.RUE.UPDRS3A.Num']+ x['Rigidity.LUE.UPDRS3A.Num'])/2 + (x['Rigidity.RLE.UPDRS3A.Num'] +x['Rigidity.LLE.UPDRS3A.Num'])/2 + x['Rigidity.Neck.UPDR3ON.Num'] + (x['Rigidity.RUE.UPDR3ON.Num'] +x['Rigidity.LUE.UPDR3ON.Num'])/2 + (x['Rigidity.RLE.UPDR3ON.Num']+x['Rigidity.LLE.UPDR3ON.Num'])/2 + x['Rigidity.Neck.UPDR3OF.Num']+ (x['Rigidity.RUE.UPDR3OF.Num']+ x['Rigidity.LUE.UPDR3OF.Num'])/2 + (x['Rigidity.RLE.UPDR3OF.Num']+x ['Rigidity.LLE.UPDR3OF.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDRS3.Num'] +x['Finger.Tapping.Left.Hand.UPDRS3.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDRS3A.Num'] +x['Finger.Tapping.Left.Hand.UPDRS3A.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDR3ON.Num'] + x['Finger.Tapping.Left.Hand.UPDR3ON.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDR3OF.Num'] +x['Finger.Tapping.Left.Hand.UPDR3OF.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDRS3.Num']+x['Hand.Movements.Left.Hand.UPDRS3.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDRS3A.Num']+x['Hand.Movements.Left.Hand.UPDRS3A.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDR3ON.Num']+x['Hand.Movements.Left.Hand.UPDR3ON.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDR3OF.Num']+x['Hand.Movements.Left.Hand.UPDR3OF.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDRS3.Num']+x['Pronation.Supination.Left.Hand.UPDRS3.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDRS3A.Num']+x ['Pronation.Supination.Left.Hand.UPDRS3A.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDR3ON.Num']+x ['Pronation.Supination.Left.Hand.UPDR3ON.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDR3OF.Num']+x['Pronation.Supination.Left.Hand.UPDR3OF.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDRS3.Num']+x ['Toe.Tapping.Left.Foot.UPDRS3.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDRS3A.Num'] +x['Toe.Tapping.Left.Foot.UPDRS3A.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDR3OF.Num'] +x['Toe.Tapping.Left.Foot.UPDR3OF.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDR3ON.Num'] +x['Toe.Tapping.Left.Foot.UPDR3ON.Num'])/2 +  (x['Leg.Agility.Right.Leg.UPDRS3.Num']+ x['Leg.Agility.Left.Leg.UPDRS3.Num'])/2+ (x['Leg.Agility.Right.Leg.UPDRS3A.Num']+ x['Leg.Agility.Left.Leg.UPDRS3A.Num'])/2 + (x['Leg.Agility.Right.Leg.UPDR3ON.Num']+ x['Leg.Agility.Left.Leg.UPDR3ON.Num'])/2+ (x['Leg.Agility.Right.Leg.UPDR3OF.Num']+ x['Leg.Agility.Left.Leg.UPDR3OF.Num'])/2
             df[new_col_name].iloc[idx] = np.nan # Fill in subscores that should be nans as nan
-        elif new_col_name.contains("Tremor") :
+        elif "Tremor" in new_col_name :
             df[new_col_name] = x['Tremor.UPDRS2.Num'] +  (x['Postural.Tremor.Right.Hand.UPDRS3.Num']  + x['Postural.Tremor.Left.Hand.UPDRS3.Num'])/2 + (x['Postural.Tremor.Right.Hand.UPDRS3A.Num'] + x['Postural.Tremor.Left.Hand.UPDRS3A.Num'])/2 + (x['Postural.Tremor.Right.Hand.UPDR3OF.Num'] + x['Postural.Tremor.Left.Hand.UPDR3OF.Num'])/2 + (x['Postural.Tremor.Right.Hand.UPDR3ON.Num'] + x['Postural.Tremor.Left.Hand.UPDR3ON.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDRS3.Num'] + x['Kinetic.Tremor.Left.Hand.UPDRS3.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDRS3A.Num'] + x['Kinetic.Tremor.Left.Hand.UPDRS3A.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDR3OF.Num'] + x['Kinetic.Tremor.Left.Hand.UPDR3OF.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDR3ON.Num'] + x['Kinetic.Tremor.Left.Hand.UPDR3ON.Num'])/2 +  (x['Rest.Tremor.Amplitude.RUE.UPDRS3.Num']+ x['Rest.Tremor.Amplitude.LUE.UPDRS3.Num'])/2 + (x['Rest.Tremor.Amplitude.RLE.UPDRS3.Num'] +  x['Rest.Tremor.Amplitude.LLE.UPDRS3.Num'])/2 + x['Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3.Num'] + (x['Rest.Tremor.Amplitude.RUE.UPDRS3A.Num'] + x['Rest.Tremor.Amplitude.LUE.UPDRS3A.Num'])/2 + (x['Rest.Tremor.Amplitude.RLE.UPDRS3A.Num'] + x['Rest.Tremor.Amplitude.LLE.UPDRS3A.Num'])/2 + x['Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3A.Num'] + (x['Rest.Tremor.Amplitude.RUE.UPDR3OF.Num'] + x['Rest.Tremor.Amplitude.LUE.UPDR3OF.Num'])/2 + (x['Rest.Tremor.Amplitude.RLE.UPDR3OF.Num'] + x['Rest.Tremor.Amplitude.LLE.UPDR3OF.Num'])/2 +  x['Rest.Tremor.Amplitude.Lip.Jaw.UPDR3OF.Num'] + (x['Rest.Tremor.Amplitude.RUE.UPDR3ON.Num'] +  x['Rest.Tremor.Amplitude.LUE.UPDR3ON.Num'])/2 +  (x['Rest.Tremor.Amplitude.RLE.UPDR3ON.Num'] + x['Rest.Tremor.Amplitude.LLE.UPDR3ON.Num'])/2 + x['Rest.Tremor.Amplitude.Lip.Jaw.UPDR3ON.Num'] +  x['Constancy.of.Rest.Tremor.UPDRS3.Num'] + x['Constancy.of.Rest.Tremor.UPDRS3A.Num'] +  x['Constancy.of.Rest.Tremor.UPDR3OF.Num'] + x['Constancy.of.Rest.Tremor.UPDR3ON.Num']
             df[new_col_name].iloc[idx] = np.nan
 
@@ -802,13 +788,13 @@ ppmi_merge['Brady.Rigidity.Subscore.lateralized'] = lateralized_scores['Brady.Ri
 ppmi_merge['Tremor.Subscore.lateralized'] = lateralized_scores['Tremor.Subscore.lateralized']
 
 ## If lateralized subscore is nan - input the non-lateralized score for Tremor and Brady.Rigidity
-# Tremor 
-latisna = ppmi_merge['Tremor.Subscore.lateralized'].isna() & ppmi_merge['Tremor.Subscore'].isna() 
-ppmi_merge["Tremor.Subscore.lateralized"].loc[latisna] = ppmi_merge["Tremor.Subscore"].loc[latisna]
+def fill_non_lat_subscore(df, subscore_lateralized_name, subscore_name) : 
+    latisna = df[subscore_lateralized_name].isna() & df[subscore_name].isna()
+    df[subscore_lateralized_name].loc[latisna] = df[subscore_name].loc[latisna]
+    return df 
 
-# Brady.Rigidity - 
-latisna = ppmi_merge['Brady.Rigidity.Subscore.lateralized'].isna() & ppmi_merge['Brady.Rigidity.Subscore'].isna() 
-ppmi_merge["Brady.Rigidity.Subscore.lateralized"].loc[latisna] = ppmi_merge["Brady.Rigidity.Subscore"].loc[latisna]
+ppmi_merge = fill_non_lat_subscore(ppmi_merge, 'Tremor.Subscore.lateralized', 'Tremor.Subscore.lateralized')
+ppmi_merge = fill_non_lat_subscore(ppmi_merge, 'Brady.Rigidity.Subscore.lateralized', 'Brady.Rigidity.Subscore.lateralized')
 
 # Make any dominant side of disease that are NA into 'Symmetric' 
 domsideisna = ppmi_merge['Dominant.Side.Disease'].isna()
@@ -824,10 +810,10 @@ for myev in myevs :
         selu = ppmi_merge.loc[(ppmi_merge['Subject.ID'] == u) & (ppmi_merge['Event.ID'] == myev) & (ppmi_merge['resnetGrade'].notna())] # For one subject at one event id if resnetGrade not na 
         if len(selu) == 1 : # If there is one event id for that subject
             idx = selu.index # Ge the index 
-            ppmi_merge[mybe].iloc[idx] = True
+            ppmi_merge.loc[idx, mybe] = True
         if len(selu) > 1 : # IF there is more than one event id for that subject and resnet grade is not na 
             maxidx = selu[['resnetGrade']].idxmax() # Get the higher resnetGrade for each visit if there are more than one 
-            ppmi_merge[mybe].iloc[maxidx] = True
+            ppmi_merge.loc[maxidx, mybe] = True
 
 ## Include a column for bestAtImage.Acquisition.Date - denote the one or highest resnetGrade with True (else = False)
 ppmi_merge['bestAtImage.Acquisition.Date'] = False # Initialize bestAtImage.Acuqisition.Date col
@@ -836,10 +822,10 @@ for myev in myevs :
         selu = ppmi_merge.loc[(ppmi_merge['Subject.ID'] == u) & (ppmi_merge['Event.ID'] == myev) & (ppmi_merge['resnetGrade'].notna())]
         if len(selu) == 1 : # If there is one event id for that subject
             idx = selu.index # Get the index 
-            ppmi_merge['bestAtImage.Acquisition.Date'].iloc[idx] = True
+            ppmi_merge.loc[idx, 'bestAtImage.Acquisition.Date'] = True
         if len(selu) > 1 : # IF there is more than one event id for that subject and resnet grade is not na 
             maxidx = selu[['resnetGrade']].idxmax() # Get the higher resnetGrade for each visit if there are more than one 
-            ppmi_merge['bestAtImage.Acquisition.Date'].iloc[maxidx] = True
+            ppmi_merge.loc[maxidx, 'bestAtImage.Acquisition.Date'] = True
 
 # DX simplified column 
 ppmi_merge['DXsimplified'] = '' # Initialize DXsimplfied
