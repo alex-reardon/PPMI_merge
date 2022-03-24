@@ -54,7 +54,6 @@ def create_cohort_df(xlsx, sheet) :
 
     return cohort_df
 
-
 def merge_columns(df : pd.DataFrame , old_df_columns : list, new_df_column_name : str, separator = str) : 
     """
     Takes entries in each of old_df_columns and joins them together with a sepator of choice.  Removes 
@@ -65,11 +64,9 @@ def merge_columns(df : pd.DataFrame , old_df_columns : list, new_df_column_name 
     df.drop(old_df_columns, axis = 1, inplace = True)
     return df 
 
-
 def getNamesFromDataframe(df, str) :
     col_names = [col for col in df.columns if str in col]
     return col_names
-
 
 def merge_new_csv(df, csv_filename, list_cols) : 
     demo_df = pd.read_csv(ppmi_download_path + csv_filename)
@@ -77,10 +74,8 @@ def merge_new_csv(df, csv_filename, list_cols) :
     ppmi_merge = pd.merge(df, demo_df, on = ['PATNO', 'EVENT_ID'], how = "outer") # Merge
     return ppmi_merge
 
-
 def isNaN(num):
     return num != num 
-
 
 def decode_0_1_no_yes(df, list) : 
     for i in list :
@@ -94,131 +89,65 @@ def decode_none2severe(df, list):
         df[i].replace({0 : 'None', 1 : 'Slight', 2: 'Mild', 3 : 'Moderate', 4 : 'Severe'}, inplace = True) 
     return df 
 
-
 # Create cohort df 
 pd_df = create_cohort_df(xlsx, 'PD') # Create Parkinson's Disease data frame from 'PD' sheet in 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
 prodromal_df = create_cohort_df(xlsx, 'Prodromal')
 hc_df = create_cohort_df(xlsx, 'HC')
 swedd_df = create_cohort_df(xlsx, 'SWEDD') # SWEDD subjects
 
-# Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables
-for row_num in range(len(pd_df)) : 
-    # Enroll Subtype - info from 'Summary' sheet of 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
-    if pd_df['ENRLPD'].iloc[row_num] == 1 and pd_df['ENRLLRRK2'].iloc[row_num] == 0 and pd_df['ENRLGBA'].iloc[row_num] == 0 and pd_df['ENRLSNCA'].iloc[row_num] == 0 :
-        pd_df['Enrollment.Subtype'].iloc[row_num] = '' # Sporadic - don't need to define here bc already covered in 'Subgroup' column in PD sheet
-    if pd_df['ENRLPD'].iloc[row_num] == 1 and pd_df['ENRLLRRK2'].iloc[row_num] == 1 : 
-        pd_df['Enrollment.Subtype'].iloc[row_num] = ' : LRRK2'
-    if pd_df['ENRLPD'].iloc[row_num] == 1 and pd_df['ENRLGBA'].iloc[row_num] == 1 : 
-        pd_df['Enrollment.Subtype'].iloc[row_num] = ' : GBA'
-    if pd_df['ENRLPD'].iloc[row_num] == 1 and pd_df['ENRLSNCA'].iloc[row_num] == 1 : 
-        pd_df['Enrollment.Subtype'].iloc[row_num] = ' : SNCA'
+# Decode Enrollment.Subtype ('Summary' sheet) and Consensus.Subtype ('Summary Analytic' sheet) of 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
+pd_df.loc[(pd_df['ENRLPD'] == 1) & (pd_df['ENRLLRRK2'] == 0) & (pd_df['ENRLGBA'] == 0) & (pd_df['ENRLSNCA'] == 0), 'Enrollment.Subtype'] = '' # Sporadic - don't need to define here bc already covered in 'Subgroup' column in PD sheet
+pd_df.loc[(pd_df['ENRLPD' ]== 1) & (pd_df['ENRLLRRK2'] == 1), 'Enrollment.Subtype'] =  ' : LRRK2'
+pd_df.loc[(pd_df['ENRLPD'] == 1) & (pd_df['ENRLGBA'] == 1), 'Enrollment.Subtype'] = ' : GBA'
+pd_df.loc[(pd_df['ENRLPD'] == 1) & (pd_df['ENRLSNCA'] == 1), 'Enrollment.Subtype'] =  ' : SNCA'
+pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2'] == 0) | (pd_df['CONLRRK2'] == '.') & (pd_df['CONGBA'] == 0) | (pd_df['CONGBA'] == '.') & (pd_df['CONSNCA'] == 0) | (pd_df['CONSNCA'] == '.') , 'Consensus.Subtype'] = 'Sporadic'
+pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2']== 1) & (pd_df['CONGBA'] == 0) & (pd_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2'
+pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2'] == 0) & (pd_df['CONGBA'] == 1) & (pd_df['CONSNCA'] == 0) , 'Consensus.Subtype'] = 'Genetic : GBA'
+pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2'] == 1) & (pd_df['CONGBA'] == 1) & (pd_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2 + GBA'
+pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2'] == 0) & (pd_df['CONGBA'] == 0) & (pd_df['CONSNCA'] == 1) , 'Consensus.Subtype'] = 'Genetic : SNCA'
+pd_df.loc[(pd_df['CONPD'] == 0) & (pd_df['CONPROD']== 0) , 'Consensus.Subtype'] = 'non-PD'
+pd_df.loc[(pd_df['CONPD'] == 0) & (pd_df['CONPROD']== 1) & (pd_df['CONLRRK2'] == 1) & (pd_df['CONGBA'] == 0) & (pd_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2 Prodromal'
+pd_df.loc[(pd_df['CONPD'] == 0) & (pd_df['CONPROD'] == 1) & (pd_df['CONLRRK2'] == 0) & (pd_df['CONGBA'] == 1) & (pd_df['CONSNCA'] == 0) , 'Consensus.Subtype'] = 'Genetic : GBA Prodromal'
 
-    # Consensus Subtype - info from 'Summary Analytic' shset of 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx' - need to include '.' (unknowns) in order for numbers ot match up with 'Summary Analytic' sheet Ns
-    if pd_df['CONPD'].iloc[row_num] == 1 and pd_df['CONLRRK2'].iloc[row_num] == 0 or pd_df['CONLRRK2'].iloc[row_num] == '.' and pd_df['CONGBA'].iloc[row_num] == 0 or pd_df['CONGBA'].iloc[row_num] == '.' and pd_df['CONSNCA'].iloc[row_num] == 0 or pd_df['CONSNCA'].iloc[row_num] == '.' :
-        pd_df['Consensus.Subtype'].iloc[row_num] = 'Sporadic'
-    if pd_df['CONPD'].iloc[row_num] == 1 and pd_df['CONLRRK2'].iloc[row_num] == 1 and pd_df['CONGBA'].iloc[row_num] == 0 and pd_df['CONSNCA'].iloc[row_num] == 0 :
-        pd_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : LRRK2'
-    if pd_df['CONPD'].iloc[row_num] == 1 and pd_df['CONLRRK2'].iloc[row_num] == 0 and pd_df['CONGBA'].iloc[row_num] == 1 and pd_df['CONSNCA'].iloc[row_num] == 0 :
-        pd_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : GBA'
-    if pd_df['CONPD'].iloc[row_num] == 1 and pd_df['CONLRRK2'].iloc[row_num] == 1 and pd_df['CONGBA'].iloc[row_num] == 1 and pd_df['CONSNCA'].iloc[row_num] == 0 :
-        pd_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : LRRK2 + GBA'
-    if pd_df['CONPD'].iloc[row_num] == 1 and pd_df['CONLRRK2'].iloc[row_num] == 0 and pd_df['CONGBA'].iloc[row_num] == 0 and pd_df['CONSNCA'].iloc[row_num] == 1 :
-        pd_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : SNCA'
-    if pd_df['CONPD'].iloc[row_num] == 0 and pd_df['CONPROD'].iloc[row_num] == 0 :
-        pd_df['Consensus.Subtype'].iloc[row_num] = 'non-PD'
-    if pd_df['CONPD'].iloc[row_num] == 0 and pd_df['CONPROD'].iloc[row_num] == 1 and pd_df['CONLRRK2'].iloc[row_num] == 1 and pd_df['CONGBA'].iloc[row_num] == 0 and pd_df['CONSNCA'].iloc[row_num] == 0 :
-        pd_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : LRRK2 Prodromal'
-    if pd_df['CONPD'].iloc[row_num] == 0 and pd_df['CONPROD'].iloc[row_num] == 1 and pd_df['CONLRRK2'].iloc[row_num] == 0 and pd_df['CONGBA'].iloc[row_num] == 1 and pd_df['CONSNCA'].iloc[row_num] == 0 :
-        pd_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : GBA Prodromal'
+# Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables for prodromal df 
+prodromal_df.loc[(prodromal_df['ENRLPROD'] == 1) & (prodromal_df['ENRLLRRK2'] == 1), 'Enrollment.Subtype'] = ' : LRRK2 Prodromal'
+prodromal_df.loc[(prodromal_df['ENRLPROD'] == 1) & (prodromal_df['ENRLGBA'] == 1), 'Enrollment.Subtype'] =  ' : GBA Prodromal'
+prodromal_df.loc[(prodromal_df['ENRLPROD'] == 1) & (prodromal_df['ENRLSNCA'] == 1), 'Enrollment.Subtype'] = ' : SNCA Prodromal'
+prodromal_df.loc[(prodromal_df['ENRLPROD'] == 1) & (prodromal_df['ENRLHPSM'] == 1) ,'Enrollment.Subtype'] = '' # Hyposmia already covered in 'Subgroup' column
+prodromal_df.loc[(prodromal_df['ENRLPROD'] == 1) & (prodromal_df['ENRLRBD'] == 1), 'Enrollment.Subtype'] = '' # RBD already covered in 'Subgroup' column
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 0) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0) ,'Consensus.Subtype'] = 'Genetic : LRRK2 Prodromal'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2 Phenoconverted'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0), 'Consensus.Subtype' ] = 'Genetic : LRRK2 not Prodromal'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : GBA Prodromal'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0) & (prodromal_df['CONRBD'] == 0), 'Consensus.Subtype'] = 'Genetic : GBA Phenoconverted'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0) , 'Consensus.Subtype' ] = 'Genetic : GBA not Prodromal'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 0) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0) , 'Consensus.Subtype'] = 'Genetic : LRRK2 + GBA Prodromal'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0) ,'Consensus.Subtype'] = 'Genetic : LRRK2 + GBA Phenoconverted'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0) , 'Consensus.Subtype' ] = 'Genetic : LRRK2 + GBA not Prodromal'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 1), 'Consensus.Subtype'] = 'Genetic : SNCA Prodromal'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 1), 'Consensus.Subtype'] = 'Genetic : SNCA Phenoconverted'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 1) , 'Consensus.Subtype' ] = 'Genetic : SNCA not Prodromal'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0) & (prodromal_df['CONHPSM'] == 0) & (prodromal_df['CONRBD'] == '.'), 'Consensus.Subtype' ] = 'No Mutation not Prodromal'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0) & (prodromal_df['CONHPSM'] == 1) & (prodromal_df['CONRBD'] == '.'), 'Consensus.Subtype'] = 'Hyposmia'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0) & (prodromal_df['CONHPSM'] == 1) & (prodromal_df['CONRBD'] == '.'), 'Consensus.Subtype' ] = 'Hyposmia : Phenoconverted'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0) & (prodromal_df['CONHPSM'] == 1) & (prodromal_df['CONRBD'] == '.'), 'Consensus.Subtype' ] =  'Hyposmia : not Prodromal'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['CONRBD'] == 1) & (prodromal_df['PHENOCNV'] == 0) , 'Consensus.Subtype'] = 'RBD'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['CONRBD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONGBA'] == 0), 'Consensus.Subtype'] = 'RBD : Phenoconverted'
+prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['CONRBD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONGBA'] == 1), 'Consensus.Subtype' ] = 'RBD : Phenoconverted with GBA'
 
-
-# Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables
-for row_num in range(len(prodromal_df)) : 
-    # Enrollment Subtype
-    if prodromal_df['ENRLPROD'].iloc[row_num] == 1 and prodromal_df['ENRLLRRK2'].iloc[row_num] == 1 : 
-        prodromal_df['Enrollment.Subtype'].iloc[row_num] = ' : LRRK2 Prodromal'
-    if prodromal_df['ENRLPROD'].iloc[row_num] == 1 and prodromal_df['ENRLGBA'].iloc[row_num] == 1 : 
-        prodromal_df['Enrollment.Subtype'].iloc[row_num] = ' : GBA Prodromal'
-    if prodromal_df['ENRLPROD'].iloc[row_num] == 1 and prodromal_df['ENRLSNCA'].iloc[row_num] == 1 : 
-        prodromal_df['Enrollment.Subtype'].iloc[row_num] = ' : SNCA Prodromal'
-    if prodromal_df['ENRLPROD'].iloc[row_num] == 1 and prodromal_df['ENRLHPSM'].iloc[row_num] == 1 : 
-        prodromal_df['Enrollment.Subtype'].iloc[row_num] = '' # Hyposmia already covered in 'Subgroup' column
-    if prodromal_df['ENRLPROD'].iloc[row_num] == 1 and prodromal_df['ENRLRBD'].iloc[row_num] == 1 : 
-        prodromal_df['Enrollment.Subtype'].iloc[row_num] = '' # RBD already covered in 'Subgroup' column
-
-    # Consensus Subtype
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 0 and prodromal_df['CONLRRK2'].iloc[row_num] == 1 and prodromal_df['CONGBA'].iloc[row_num] == 0 and prodromal_df['CONSNCA'].iloc[row_num] == 0 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : LRRK2 Prodromal'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 1 and prodromal_df['CONLRRK2'].iloc[row_num] == 1 and prodromal_df['CONGBA'].iloc[row_num] == 0 and prodromal_df['CONSNCA'].iloc[row_num] == 0 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : LRRK2 Phenoconverted'
-    if prodromal_df['CONPROD'].iloc[row_num] == 0 and prodromal_df['CONLRRK2'].iloc[row_num] == 1 and prodromal_df['CONGBA'].iloc[row_num] == 0 and prodromal_df['CONSNCA'].iloc[row_num] == 0 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : LRRK2 not Prodromal'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 0 and prodromal_df['CONLRRK2'].iloc[row_num] == 0 and prodromal_df['CONGBA'].iloc[row_num] == 1 and prodromal_df['CONSNCA'].iloc[row_num] == 0 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : GBA Prodromal'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 1 and prodromal_df['CONLRRK2'].iloc[row_num] == 0 and prodromal_df['CONGBA'].iloc[row_num] == 1 and prodromal_df['CONSNCA'].iloc[row_num] == 0 and prodromal_df['CONRBD'].iloc[row_num] == 0 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : GBA Phenoconverted'
-    if prodromal_df['CONPROD'].iloc[row_num] == 0 and prodromal_df['CONLRRK2'].iloc[row_num] == 0 and prodromal_df['CONGBA'].iloc[row_num] == 1 and prodromal_df['CONSNCA'].iloc[row_num] == 0 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : GBA not Prodromal'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 0 and prodromal_df['CONLRRK2'].iloc[row_num] == 1 and prodromal_df['CONGBA'].iloc[row_num] == 1 and prodromal_df['CONSNCA'].iloc[row_num] == 0 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : LRRK2 + GBA Prodromal'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 1 and prodromal_df['CONLRRK2'].iloc[row_num] == 1 and prodromal_df['CONGBA'].iloc[row_num] == 1 and prodromal_df['CONSNCA'].iloc[row_num] == 0 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : LRRK2 + GBA Phenoconverted'
-    if prodromal_df['CONPROD'].iloc[row_num] == 0 and prodromal_df['CONLRRK2'].iloc[row_num] == 1 and prodromal_df['CONGBA'].iloc[row_num] == 1 and prodromal_df['CONSNCA'].iloc[row_num] == 0 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : LRRK2 + GBA not Prodromal'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 0 and prodromal_df['CONLRRK2'].iloc[row_num] == 0 and prodromal_df['CONGBA'].iloc[row_num] == 0 and prodromal_df['CONSNCA'].iloc[row_num] == 1 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : SNCA Prodromal'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 1 and prodromal_df['CONLRRK2'].iloc[row_num] == 0 and prodromal_df['CONGBA'].iloc[row_num] == 0 and prodromal_df['CONSNCA'].iloc[row_num] == 1 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : SNCA Phenoconverted'
-    if prodromal_df['CONPROD'].iloc[row_num] == 0 and prodromal_df['CONLRRK2'].iloc[row_num] == 0 and prodromal_df['CONGBA'].iloc[row_num] == 0 and prodromal_df['CONSNCA'].iloc[row_num] == 1 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Genetic : SNCA not Prodromal'
-    if prodromal_df['CONPROD'].iloc[row_num] == 0 and prodromal_df['CONLRRK2'].iloc[row_num] == 0 and prodromal_df['CONGBA'].iloc[row_num] == 0 and prodromal_df['CONSNCA'].iloc[row_num] == 0 and prodromal_df['CONHPSM'].iloc[row_num] == 0 and prodromal_df['CONRBD'].iloc[row_num] == '.':
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'No Mutation not Prodromal'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 0 and prodromal_df['CONLRRK2'].iloc[row_num] == 0 and prodromal_df['CONGBA'].iloc[row_num] == 0 and prodromal_df['CONSNCA'].iloc[row_num] == 0 and prodromal_df['CONHPSM'].iloc[row_num] == 1 and prodromal_df['CONRBD'].iloc[row_num] == '.':
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Hyposmia'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 1 and prodromal_df['CONLRRK2'].iloc[row_num] == 0 and prodromal_df['CONGBA'].iloc[row_num] == 0 and prodromal_df['CONSNCA'].iloc[row_num] == 0 and prodromal_df['CONHPSM'].iloc[row_num] == 1 and prodromal_df['CONRBD'].iloc[row_num] == '.':
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Hyposmia : Phenoconverted'
-    if prodromal_df['CONPROD'].iloc[row_num] == 0 and prodromal_df['CONLRRK2'].iloc[row_num] == 0 and prodromal_df['CONGBA'].iloc[row_num] == 0 and prodromal_df['CONSNCA'].iloc[row_num] == 0 and prodromal_df['CONHPSM'].iloc[row_num] == 1 and prodromal_df['CONRBD'].iloc[row_num] == '.':
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'Hyposmia : not Prodromal'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['CONRBD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 0 :
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'RBD'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['CONRBD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 1 and prodromal_df['CONGBA'].iloc[row_num] == 0:
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'RBD : Phenoconverted'
-    if prodromal_df['CONPROD'].iloc[row_num] == 1 and prodromal_df['CONRBD'].iloc[row_num] == 1 and prodromal_df['PHENOCNV'].iloc[row_num] == 1 and prodromal_df['CONGBA'].iloc[row_num] == 1:
-        prodromal_df['Consensus.Subtype'].iloc[row_num] = 'RBD : Phenoconverted with GBA'
-
+# Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables for Healthy Control df 
+hc_df.loc[(hc_df['ENRLHC'] == 1), 'Enrollment.Subtype'] = ''
+hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 0) & (hc_df['CONGBA'] == 0) & (hc_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Healthy Control'
+hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 1) & (hc_df['CONGBA'] == 0) & (hc_df['CONSNCA'] == 0),'Consensus.Subtype'] = 'LRRK2'
+hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 0) & (hc_df['CONGBA'] == 1) & (hc_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'GBA'
+hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 1) & (hc_df['CONGBA'] == 1) & (hc_df['CONSNCA'] == 0) ,'Consensus.Subtype'] = 'LRRK + GBA'
+hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 0) & (hc_df['CONGBA'] == 0) & (hc_df['CONSNCA'] == 1), 'Consensus.Subtype'] = 'SNCA'
+hc_df.loc[(hc_df['CONHC'] == 0), 'Consensus.Subtype'] = 'non-HC'  # FIXME
 
 # Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables
-for row_num in range(len(hc_df)) : 
-    # Enrollment
-    if hc_df['ENRLHC'].iloc[row_num] == 1 : 
-        hc_df['Enrollment.Subtype'].iloc[row_num] = ''
-
-    # Consensus 
-    if hc_df['CONHC'].iloc[row_num] == 1 and hc_df['CONLRRK2'].iloc[row_num] == 0 and hc_df['CONGBA'].iloc[row_num] == 0 and hc_df['CONSNCA'].iloc[row_num] == 0  :
-        hc_df['Consensus.Subtype'].iloc[row_num] = 'Healthy Control'
-    if hc_df['CONHC'].iloc[row_num] == 1 and hc_df['CONLRRK2'].iloc[row_num] == 1 and hc_df['CONGBA'].iloc[row_num] == 0 and hc_df['CONSNCA'].iloc[row_num] == 0  :
-        hc_df['Consensus.Subtype'].iloc[row_num] = 'LRRK2'
-    if hc_df['CONHC'].iloc[row_num] == 1 and hc_df['CONLRRK2'].iloc[row_num] == 0 and hc_df['CONGBA'].iloc[row_num] == 1 and hc_df['CONSNCA'].iloc[row_num] == 0  :
-        hc_df['Consensus.Subtype'].iloc[row_num] = 'GBA'
-    if hc_df['CONHC'].iloc[row_num] == 1 and hc_df['CONLRRK2'].iloc[row_num] == 1 and hc_df['CONGBA'].iloc[row_num] == 1 and hc_df['CONSNCA'].iloc[row_num] == 0  :
-        hc_df['Consensus.Subtype'].iloc[row_num] = 'LRRK + GBA'
-    if hc_df['CONHC'].iloc[row_num] == 1 and hc_df['CONLRRK2'].iloc[row_num] == 0 and hc_df['CONGBA'].iloc[row_num] == 0 and hc_df['CONSNCA'].iloc[row_num] == 1  :
-        hc_df['Consensus.Subtype'].iloc[row_num] = 'SNCA'
-    if hc_df['CONHC'].iloc[row_num] == 0 :
-        hc_df['Consensus.Subtype'].iloc[row_num] = 'non-HC' # FIXME
-
-
-# Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables
-for row_num in range(len(swedd_df)) : 
-    # Enrollment 
-    if swedd_df['ENRLSWEDD'].iloc[row_num] == 1 : 
-        swedd_df['Enrollment.Subtype'].iloc[row_num] = 'SWEDD Legacy'
-
-    # Consensus
-    if swedd_df['CONSWEDD'].iloc[row_num] == 0 :
-        swedd_df['Consensus.Subtype'].iloc[row_num] = 'SWEDD/PD Active'
-    if swedd_df['CONSWEDD'].iloc[row_num] == 1 :
-        swedd_df['Consensus.Subtype'].iloc[row_num] = 'SWEDD/non-PD Active'
+swedd_df.loc[swedd_df['ENRLSWEDD'] == 1 , 'Enrollment.Subtype'] =  'SWEDD Legacy'
+swedd_df.loc[swedd_df['CONSWEDD'] == 0 , 'Consensus.Subtype'] = 'SWEDD/PD Active'
+swedd_df.loc[swedd_df['CONSWEDD'] == 1 ,'Consensus.Subtype'] =  'SWEDD/non-PD Active'
 
 # Merge the four dataframes (HC, Prodromal, PD, SWEDD)
 full_df = pd_df.append([prodromal_df, hc_df, swedd_df]) # Concat all 4 cohort dfs
@@ -240,7 +169,7 @@ full_df.rename(columns = {'Cohort' : 'Enroll.Diagnosis' , 'PHENOCNV' : 'Subject.
 full_df = full_df[['PATNO', 'Enroll.Diagnosis', 'Enroll.Subtype', 'Consensus.Diagnosis', 'Consensus.Subtype','Subject.Phenoconverted','DIAG1','DIAG1VIS', 'DIAG2','DIAG2VIS']] # Reorganize column order 
 analytic_cohort_subids = full_df['PATNO'].unique() # subids for analytic cohort 
 
-## Add in age info at each visit - for all subjects in Age_at_visit.csv 
+## Add in age info at each visit 
 age_df = pd.read_csv(ppmi_download_path + 'Age_at_visit.csv', skipinitialspace = True) # Age info
 age_df.rename(columns = {'AGE_AT_VISIT' : 'Age'}, inplace = True) # Rename column 
 ppmi_merge = pd.merge(full_df, age_df, on = 'PATNO', how = "outer") # Merge full_df with age_df
@@ -375,12 +304,10 @@ education_df = education_df.groupby('PATNO').mean().reset_index() # Take the mea
 ppmi_merge = pd.merge(ppmi_merge, education_df, on = ['PATNO'], how = "outer") # Merge
 
 ## Add in analytic cohort column 
+analytic_cohort = ppmi_merge['PATNO'].isin(analytic_cohort_subids)
 ppmi_merge['Analytic.Cohort'] = '' # Initialize Analytic.Cohort col
-for row_num in range(len(ppmi_merge['Analytic.Cohort'])) : 
-    if ppmi_merge['PATNO'].iloc[row_num] in analytic_cohort_subids : 
-        ppmi_merge['Analytic.Cohort'].iloc[row_num] = 'Analytic Cohort'
-    else : 
-        ppmi_merge['Analytic.Cohort'].iloc[row_num] = 'Not Analytic Cohort' 
+ppmi_merge['Analytic.Cohort'].loc[analytic_cohort] = 'Analytic Cohort'
+ppmi_merge['Analytic.Cohort'].fillna('Not Analytic Cohort', inplace = True)
 
 ## Reindex 
 ppmi_merge = ppmi_merge.reindex(columns = ['PATNO', 'EVENT_ID', 'INFODT' , 'Enroll.Diagnosis', 'Enroll.Subtype', 'Consensus.Diagnosis', 'Consensus.Subtype','Analytic.Cohort','Subject.Phenoconverted','First.Diagnosis.Change', 'Second.Diagnosis.Change',  'First.Symptom.Date', 'PD.Diagnosis.Date', 'PD.Diagnosis.Duration','BirthDate', 'Age', 'Sex', 'Handed', 'Weight(kg)',	'Height(cm)', 'Education.Years', 'DOMSIDE', 'Motor.Function.Page.Name',	'Motor.Function.Source',	'Trouble.Rising.Chair',	'Writing.Smaller',	'Voice.Softer',	'Poor.Balance',	'Feet.Stuck',	'Less.Expressive',	'Arms/Legs.Shake',	'Trouble.Buttons',	'Shuffle.Feet',	'Slow.Movements',	'Been.Told.PD',	'Cognitive.Page.Name',	'Cognitive.Source', 'Cognitive.Decline',	'Functional.Cognitive.Impairment',	'Confidence.Level.Cognitive.Diagnosis',	'Cognitive.State',	'Cognitive.Tscore.Cat',	'MOCA.Total', 'Medication' , 'LEDD' , 'LEDD.STARTDT' , 'LEDD.STOPDT', 'Medical.History.Description(Diagnosis.Date)'])
@@ -582,13 +509,11 @@ for col_name in updrs_numeric:
 # UPDRS3 (four dataframes) decode and rename in loop
 updrs3_df_list = [nupdrs3_copy, nupdrs3A_copy, nupdr3ON_copy, nupdr3OF_copy]
 ext_list = ['.UPDRS3', '.UPDRS3A', '.UPDR3ON', '.UPDR3OF']
-nupdrs3_colname_list = ['NP3SPCH', 'NP3FACXP', 'NP3RIGN', 'NP3RIGRU', 'NP3RIGLU', 'NP3RIGRL', 'NP3RIGLL', 'NP3FTAPR', 'NP3FTAPL', 'NP3HMOVR', 'NP3HMOVL', 'NP3PRSPR', 'NP3PRSPL', 'NP3TTAPR', 'NP3TTAPL', 'NP3LGAGR', 'NP3LGAGL', 'NP3RISNG', 'NP3GAIT', 'NP3FRZGT', 'NP3PSTBL', 'NP3POSTR', 'NP3BRADY', 'NP3PTRMR', 'NP3PTRML', 'NP3KTRMR', 'NP3KTRML', 'NP3RTARU', 'NP3RTALU', 'NP3RTARL', 'NP3RTALL', 'NP3RTALJ', 'NP3RTCON']
 
 # Decode, rename columns and add extension for updrs3 dfs in updrs3_df_list 
 count = 0
 for df in [nupdrs3_copy, nupdrs3A_copy, nupdr3ON_copy, nupdr3OF_copy] : 
-    for col_name in nupdrs3_colname_list :
-        df[col_name].replace({0 : 'None', 1 : 'Slight', 2: 'Mild', 3 : 'Moderate', 4 : 'Severe'}, inplace = True) 
+    df = decode_none2severe(df, ['NP3SPCH', 'NP3FACXP', 'NP3RIGN', 'NP3RIGRU', 'NP3RIGLU', 'NP3RIGRL', 'NP3RIGLL', 'NP3FTAPR', 'NP3FTAPL', 'NP3HMOVR', 'NP3HMOVL', 'NP3PRSPR', 'NP3PRSPL', 'NP3TTAPR', 'NP3TTAPL', 'NP3LGAGR', 'NP3LGAGL', 'NP3RISNG', 'NP3GAIT', 'NP3FRZGT', 'NP3PSTBL', 'NP3POSTR', 'NP3BRADY', 'NP3PTRMR', 'NP3PTRML', 'NP3KTRMR', 'NP3KTRML', 'NP3RTARU', 'NP3RTALU', 'NP3RTARL', 'NP3RTALL', 'NP3RTALJ', 'NP3RTCON'])
     df['DBS_STATUS'].replace({0 : 'OFF', 1 : 'ON'}, inplace = True) 
     df = decode_0_1_no_yes(df, ['DYSKPRES','DYSKIRAT'])
     df['NHY'].replace({0 : 'Asymptomatic', 1 : 'Unilateral Movement Only', 2: 'Bilateral involvement without impairment of balance', 3 : 'Mild to moderate involvement',4: 'Severe disability', 5 : 'Wheelchair bound or bedridden'}, inplace = True) 
@@ -629,23 +554,17 @@ updrs_cat = pd.merge(updrs_cat, updrs_part4_motor_df_copy, on = ['PATNO', 'EVENT
 ## Decode UPDRS df variables
 # MNDS_UPDRS Part 1 
 updrs_cat['UPDRS.Part1.Source'].replace({1 : 'Patient' , 2 : 'Caregiver' , 3 : 'Patient and Caregiver'}, inplace = True) 
-np1_list = ['NP1COG', 'NP1HALL', 'NP1DPRS', 'NP1ANXS', 'NP1APAT', 'NP1DDS']
-for col in np1_list : 
-    updrs_cat[col].replace({0 : 'None', 1 : 'Slight', 2: 'Mild', 3 : 'Moderate', 4 : 'Severe'}, inplace = True) 
+updrs_cat = decode_none2severe(updrs_cat, ['NP1COG', 'NP1HALL', 'NP1DPRS', 'NP1ANXS', 'NP1APAT', 'NP1DDS'])
 updrs_cat.rename(columns = {'UPDRS.Part1.Source' : 'UPDRS.Part1.Source.UPDRS1', 'NP1COG' : 'Cognitive.Impairment.UPDRS1', 'NP1HALL' : 'Hallucinations.and.Psychosis.UPDRS1', 'NP1DPRS' : 'Depressed.Moods.UPDRS1', 'NP1ANXS' : 'Anxious.Moods.UPDRS1', 'NP1APAT' : 'Apathy.UPDRS1', 'NP1DDS' : 'Features.of.Dopamine.Dysregulation.Syndrome.UPDRS1', 'NP1RTOT' : 'UPDRS.Part1.Rater.Completed.Total.UPDRS1'}, inplace = True)
 
 # MDS_UPDRS_Part 1 Patient Questionnaire 
 updrs_cat['UPDRS.Part1.PQ.Source'].replace({1 : 'Patient', 2 : 'Caregiver', 3: 'Patient and Caregiver'}, inplace = True) 
-np1_pq_list= ['NP1SLPN', 'NP1SLPD', 'NP1PAIN', 'NP1URIN', 'NP1CNST', 'NP1LTHD', 'NP1FATG']
-for col in np1_pq_list : 
-    updrs_cat[col].replace({0 : 'None', 1 : 'Slight', 2: 'Mild', 3 : 'Moderate', 4 : 'Severe'}, inplace = True) 
+updsr_cat = decode_none2severe(updrs_cat, ['NP1SLPN', 'NP1SLPD', 'NP1PAIN', 'NP1URIN', 'NP1CNST', 'NP1LTHD', 'NP1FATG'])
 updrs_cat.rename(columns = {'UPDRS.Part1.PQ.Source' : 'UPDRS.Part1.Patient.Questionnaire.Source.UPDRS1','NP1SLPN' : 'Sleep.Problems.Night.UPDRS1', 'NP1SLPD' : 'Daytime.Sleepiness.UPDRS1', 'NP1PAIN' : 'Pain.UPDRS1' , 'NP1URIN' : 'Urinary.Problems.UPDRS1', 'NP1CNST' : 'Constipation.Problems.UPDRS1' , 'NP1LTHD' : 'Lightheadedness.on.Standing.UPDRS1' , 'NP1FATG' : 'Fatigue.UPDRS1', 'NP1PTOT' : 'UPDRS.Part1.Patient.Completed.Total.UPDRS1'}, inplace = True)
 
 # MDS_UPDRS Part 2
 updrs_cat['UPDRS.Part2.Source'].replace({1 : 'Patient', 2 : 'Caregiver', 3 : 'Patient and Caregiver'}, inplace = True) 
-np2_list = ['NP2SPCH','NP2SALV','NP2SWAL','NP2EAT','NP2DRES','NP2HYGN','NP2HWRT','NP2HOBB','NP2TURN','NP2TRMR','NP2RISE','NP2WALK','NP2FREZ']
-for col in np2_list : 
-    updrs_cat[col].replace({0 : 'None', 1: 'Slight', 2: 'Mild', 3 : 'Moderate', 4: 'Severe'}, inplace = True) 
+updrs_cat = decode_none2severe(updrs_cat,['NP2SPCH','NP2SALV','NP2SWAL','NP2EAT','NP2DRES','NP2HYGN','NP2HWRT','NP2HOBB','NP2TURN','NP2TRMR','NP2RISE','NP2WALK','NP2FREZ'])
 updrs_cat.rename(columns = {'UPDRS.Part2.Source' : 'UPDRS.Part2.Source.UPDRS2', 'NP2SPCH' : 'UPDRS2.Speech.Difficulty.UPDRS2' , 'NP2SALV' : 'Saliva.Drooling.UPDRS2' ,'NP2SWAL': 'Chewing.Swallowing.Difficulty.UPDRS2', 'NP2EAT' : 'Eating.Difficulty.UPDRS2', 'NP2DRES' : 'Dressing.Difficulty.UPDRS2', 'NP2HYGN' : 'Hygiene.Difficulty.UPDRS2' , 'NP2HWRT' : 'Handwriting.Difficulty.UPDRS2' ,'NP2HOBB' : 'Hobbies.Difficulty.UPDRS2' ,'NP2TURN' : 'Turning.in.Bed.Difficulty.UPDRS2', 'NP2TRMR' : 'Tremor.UPDRS2', 'NP2RISE' : 'UPDRS2.Rising.from.Chair.Difficulty.UPDRS2', 'NP2WALK' : 'Walking.Difficulty.UPDRS2' ,'NP2FREZ' : 'Freezing.while.Walking.UPDRS2' , 'NP2PTOT': 'UPDRS.Part2.Total.UPDRS2'}, inplace = True)
 
 # MDS_UPDRS Part 3 On OFF determination Dosing 
@@ -668,9 +587,7 @@ updrs_cat['NP4FLCTI'].replace({0 : 'Normal', 1: 'Slight', 2: 'Mild', 3: 'Moderat
 updrs_cat['NP4DYSTN'].replace({0 : 'No dystonia', 1: 'Slight: <= 25% of time in OFF state', 2: 'Mild : 26-50% of time in OFF state', 3 : 'Moderate: 51-75% of time in OFF state', 4: 'Severe: > 75% of time in OFF state'}, inplace = True) 
 updrs_cat['NP4FLCTX'].replace({0: 'Normal', 1 : 'Slight', 2: 'Mild', 3 : 'Moderate', 4 : 'Severe'}, inplace = True) 
 updrs_cat['RMNOPRT3'].replace({1 : 'Visit was not conducted with video', 2 : 'Scheduling issues', 3: 'Other reason'}, inplace = True)
-updrs_cat.rename(columns = {'RMNOPRT3': 'Reason.UPDRSPart3.Not.Administered.Remote.Visit.UPDRDOSE','NP4WDYSKDEN':'4.1.Time.with.Dyskinesias.UPDRS4', 'NP4WDYSKNUM' :'4.1.Total.Hours.Awake.UPDRS4', 'NP4WDYSKPCT' : 'Percent.Dyskinesia.UPDRS4','NP4OFFDEN':'4.3.Total.Hours.OFF.UPDRS4', 'NP4OFFNUM' : '4.3.Total.Hours.Awake.UPDRS4','NP4OFFPCT' : 'Percent.OFF.UPDRS4', 'NP4DYSTNDEN' :'4.6.Total.Hours.OFF.with.Dystonia.UPDRS4',	'NP4DYSTNNUM':'4.6.Total.Hours.OFF.UPDRS4', 'NP4DYSTNPCT':'4.6.Percent.OFF.Dystonia.UPDRS4'}, inplace = True)
-updrs_cat.rename(columns = {'NP4WDYSK' : 'Time.Spent.with.Dyskinesias.UPDRS4', 'NP4DYSKI':'Functional.Impact.of.Dyskinesias.UPDRS4','NP4OFF' : 'Time.Spent.in.OFF.State.UPDRS4', 	'NP4FLCTI':'Functional.Impact.Fluctuations.UPDRS4',	'NP4FLCTX':'Complexity.of.Motor.Fluctuations.UPDRS4' ,	'NP4DYSTN':'Painful.OFF-state.Dystonia.UPDRS4' ,'NP4TOT': 'UPDRS.Part4.Total.UPDRS4' }, inplace = True)
-updrs_cat.rename(columns = {'NP4WDYSKDEN' : '4.1.Total.Hours.with.Dyskinesia', 'NP4WDYSKNUM' : '4.1.Total.Hours.Awake', 'NP4WDYSKPCT' : '4.1.%.Dyskinesia',  'NP4OFFDEN' :'4.3.Total.Hours.OFF' , 'NP4OFFNUM' :'4.3.Total.Hours.Awake' , 'NP4OFFPCT': '4.3.%.OFF', 'NP4DYSTNDEN' : '4.6.Total.Hours.OFF.with.Dystonia', 'NP4DYSTNNUM' :'4.6.Total.Hours.OFF', 'NP4DYSTNPCT' : '4.6.%.OFF.Dystonia' ,'NP4DYSTNPCT' :'4.6.%.OFF.Dystonia'}, inplace = True)
+updrs_cat.rename(columns = {'RMNOPRT3': 'Reason.UPDRSPart3.Not.Administered.Remote.Visit.UPDRDOSE','NP4WDYSKDEN':'4.1.Time.with.Dyskinesias.UPDRS4', 'NP4WDYSKNUM' :'4.1.Total.Hours.Awake.UPDRS4', 'NP4WDYSKPCT' : 'Percent.Dyskinesia.UPDRS4','NP4OFFDEN':'4.3.Total.Hours.OFF.UPDRS4', 'NP4OFFNUM' : '4.3.Total.Hours.Awake.UPDRS4','NP4OFFPCT' : 'Percent.OFF.UPDRS4', 'NP4DYSTNDEN' :'4.6.Total.Hours.OFF.with.Dystonia.UPDRS4',	'NP4DYSTNNUM':'4.6.Total.Hours.OFF.UPDRS4', 'NP4DYSTNPCT':'4.6.Percent.OFF.Dystonia.UPDRS4', 'NP4WDYSK' : 'Time.Spent.with.Dyskinesias.UPDRS4', 'NP4DYSKI':'Functional.Impact.of.Dyskinesias.UPDRS4','NP4OFF' : 'Time.Spent.in.OFF.State.UPDRS4', 	'NP4FLCTI':'Functional.Impact.Fluctuations.UPDRS4',	'NP4FLCTX':'Complexity.of.Motor.Fluctuations.UPDRS4' ,	'NP4DYSTN':'Painful.OFF-state.Dystonia.UPDRS4' ,'NP4TOT': 'UPDRS.Part4.Total.UPDRS4','NP4WDYSKDEN' : '4.1.Total.Hours.with.Dyskinesia', 'NP4WDYSKNUM' : '4.1.Total.Hours.Awake', 'NP4WDYSKPCT' : '4.1.%.Dyskinesia',  'NP4OFFDEN' :'4.3.Total.Hours.OFF' , 'NP4OFFNUM' :'4.3.Total.Hours.Awake' , 'NP4OFFPCT': '4.3.%.OFF', 'NP4DYSTNDEN' : '4.6.Total.Hours.OFF.with.Dystonia', 'NP4DYSTNNUM' :'4.6.Total.Hours.OFF', 'NP4DYSTNPCT' : '4.6.%.OFF.Dystonia' ,'NP4DYSTNPCT' :'4.6.%.OFF.Dystonia'}, inplace = True)
 
 # Add .Cat extensino to updrs_cat col names
 for col in updrs_cat: 
@@ -833,7 +750,7 @@ def add_lateralized_subscores(df : pd.DataFrame, subscore_side_list : list, side
 
     subscore_side_list : list containing column names of the scores that make up the subscore
 
-    side : 'Left' or 'Right'
+    side : 'Left' or 'Right' or 'Symmetric'
 
     new_col_name : name of new column name with lateralized subscore 
 
@@ -844,23 +761,25 @@ def add_lateralized_subscores(df : pd.DataFrame, subscore_side_list : list, side
     subscore_side.loc[subscore_side['Dominant.Side.Disease'] != side, :] = np.nan # Make all rows nan if dominant side of disease is not left 
     subscore_side_temp = subscore_side.drop('Dominant.Side.Disease',1) # Drop dominant side of disease - necessary because this cannot be summed in next line
     idx = subscore_side_temp.index[subscore_side_temp.isnull().all(1)] # Get idx where all column values of the same row are nan - this is because these will fill in as 0 when in reality they aren't zero they should be nans
-    df[new_col_name] = subscore_side_temp.sum(axis = 1) # Sum of all columns in each row where dom side is left 
-    df[new_col_name].iloc[idx] = np.nan # Fill in subscores that should be nans as nan
+    
+    if side == 'Left' or side == 'Right' : 
+        df[new_col_name] = subscore_side_temp.sum(axis = 1) # Sum of all columns in each row where dom side is left 
+        df[new_col_name].iloc[idx] = np.nan # Fill in subscores that should be nans as nan
+
+    elif side == 'Symmetric': 
+        x = subscore_side_temp.fillna(0) # because adding 1 plus nan equals nan
+        if new_col_name.contains("Brady") :  
+            df[new_col_name] = x['Rigidity.Neck.UPDRS3.Num'] + (x['Rigidity.RUE.UPDRS3.Num'] + x['Rigidity.LUE.UPDRS3.Num'])/2 + (x['Rigidity.RLE.UPDRS3.Num'] + x['Rigidity.LLE.UPDRS3.Num'])/2  + x['Rigidity.Neck.UPDRS3A.Num']+ (x['Rigidity.RUE.UPDRS3A.Num']+ x['Rigidity.LUE.UPDRS3A.Num'])/2 + (x['Rigidity.RLE.UPDRS3A.Num'] +x['Rigidity.LLE.UPDRS3A.Num'])/2 + x['Rigidity.Neck.UPDR3ON.Num'] + (x['Rigidity.RUE.UPDR3ON.Num'] +x['Rigidity.LUE.UPDR3ON.Num'])/2 + (x['Rigidity.RLE.UPDR3ON.Num']+x['Rigidity.LLE.UPDR3ON.Num'])/2 + x['Rigidity.Neck.UPDR3OF.Num']+ (x['Rigidity.RUE.UPDR3OF.Num']+ x['Rigidity.LUE.UPDR3OF.Num'])/2 + (x['Rigidity.RLE.UPDR3OF.Num']+x ['Rigidity.LLE.UPDR3OF.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDRS3.Num'] +x['Finger.Tapping.Left.Hand.UPDRS3.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDRS3A.Num'] +x['Finger.Tapping.Left.Hand.UPDRS3A.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDR3ON.Num'] + x['Finger.Tapping.Left.Hand.UPDR3ON.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDR3OF.Num'] +x['Finger.Tapping.Left.Hand.UPDR3OF.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDRS3.Num']+x['Hand.Movements.Left.Hand.UPDRS3.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDRS3A.Num']+x['Hand.Movements.Left.Hand.UPDRS3A.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDR3ON.Num']+x['Hand.Movements.Left.Hand.UPDR3ON.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDR3OF.Num']+x['Hand.Movements.Left.Hand.UPDR3OF.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDRS3.Num']+x['Pronation.Supination.Left.Hand.UPDRS3.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDRS3A.Num']+x ['Pronation.Supination.Left.Hand.UPDRS3A.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDR3ON.Num']+x ['Pronation.Supination.Left.Hand.UPDR3ON.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDR3OF.Num']+x['Pronation.Supination.Left.Hand.UPDR3OF.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDRS3.Num']+x ['Toe.Tapping.Left.Foot.UPDRS3.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDRS3A.Num'] +x['Toe.Tapping.Left.Foot.UPDRS3A.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDR3OF.Num'] +x['Toe.Tapping.Left.Foot.UPDR3OF.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDR3ON.Num'] +x['Toe.Tapping.Left.Foot.UPDR3ON.Num'])/2 +  (x['Leg.Agility.Right.Leg.UPDRS3.Num']+ x['Leg.Agility.Left.Leg.UPDRS3.Num'])/2+ (x['Leg.Agility.Right.Leg.UPDRS3A.Num']+ x['Leg.Agility.Left.Leg.UPDRS3A.Num'])/2 + (x['Leg.Agility.Right.Leg.UPDR3ON.Num']+ x['Leg.Agility.Left.Leg.UPDR3ON.Num'])/2+ (x['Leg.Agility.Right.Leg.UPDR3OF.Num']+ x['Leg.Agility.Left.Leg.UPDR3OF.Num'])/2
+            df[new_col_name].iloc[idx] = np.nan # Fill in subscores that should be nans as nan
+        elif new_col_name.contains("Tremor") :
+            df[new_col_name] = x['Tremor.UPDRS2.Num'] +  (x['Postural.Tremor.Right.Hand.UPDRS3.Num']  + x['Postural.Tremor.Left.Hand.UPDRS3.Num'])/2 + (x['Postural.Tremor.Right.Hand.UPDRS3A.Num'] + x['Postural.Tremor.Left.Hand.UPDRS3A.Num'])/2 + (x['Postural.Tremor.Right.Hand.UPDR3OF.Num'] + x['Postural.Tremor.Left.Hand.UPDR3OF.Num'])/2 + (x['Postural.Tremor.Right.Hand.UPDR3ON.Num'] + x['Postural.Tremor.Left.Hand.UPDR3ON.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDRS3.Num'] + x['Kinetic.Tremor.Left.Hand.UPDRS3.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDRS3A.Num'] + x['Kinetic.Tremor.Left.Hand.UPDRS3A.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDR3OF.Num'] + x['Kinetic.Tremor.Left.Hand.UPDR3OF.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDR3ON.Num'] + x['Kinetic.Tremor.Left.Hand.UPDR3ON.Num'])/2 +  (x['Rest.Tremor.Amplitude.RUE.UPDRS3.Num']+ x['Rest.Tremor.Amplitude.LUE.UPDRS3.Num'])/2 + (x['Rest.Tremor.Amplitude.RLE.UPDRS3.Num'] +  x['Rest.Tremor.Amplitude.LLE.UPDRS3.Num'])/2 + x['Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3.Num'] + (x['Rest.Tremor.Amplitude.RUE.UPDRS3A.Num'] + x['Rest.Tremor.Amplitude.LUE.UPDRS3A.Num'])/2 + (x['Rest.Tremor.Amplitude.RLE.UPDRS3A.Num'] + x['Rest.Tremor.Amplitude.LLE.UPDRS3A.Num'])/2 + x['Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3A.Num'] + (x['Rest.Tremor.Amplitude.RUE.UPDR3OF.Num'] + x['Rest.Tremor.Amplitude.LUE.UPDR3OF.Num'])/2 + (x['Rest.Tremor.Amplitude.RLE.UPDR3OF.Num'] + x['Rest.Tremor.Amplitude.LLE.UPDR3OF.Num'])/2 +  x['Rest.Tremor.Amplitude.Lip.Jaw.UPDR3OF.Num'] + (x['Rest.Tremor.Amplitude.RUE.UPDR3ON.Num'] +  x['Rest.Tremor.Amplitude.LUE.UPDR3ON.Num'])/2 +  (x['Rest.Tremor.Amplitude.RLE.UPDR3ON.Num'] + x['Rest.Tremor.Amplitude.LLE.UPDR3ON.Num'])/2 + x['Rest.Tremor.Amplitude.Lip.Jaw.UPDR3ON.Num'] +  x['Constancy.of.Rest.Tremor.UPDRS3.Num'] + x['Constancy.of.Rest.Tremor.UPDRS3A.Num'] +  x['Constancy.of.Rest.Tremor.UPDR3OF.Num'] + x['Constancy.of.Rest.Tremor.UPDR3ON.Num']
+            df[new_col_name].iloc[idx] = np.nan
 
     return df 
 
 ppmi_merge = add_lateralized_subscores(ppmi_merge, brady_left, 'Left', 'Brady.Rigidity.Subscore-left')
 ppmi_merge = add_lateralized_subscores(ppmi_merge, brady_right, 'Right', 'Brady.Rigidity.Subscore-right')
-
-## BRADY SYM
-brady_only_sym = ppmi_merge[brady_sym] # Get dataframe of only columns in brady sym 
-ppmi_merge['Brady.Rigidity.Subscore-sym'] = 0 # Initialize lateralized variable
-brady_only_sym.loc[brady_only_sym['Dominant.Side.Disease'] != 'Symmetric', : ] = np.nan # Make all rows nan if dominant side of disease is not symmetric 
-brady_sym_temp= brady_only_sym.drop('Dominant.Side.Disease', 1) # Drop dominant side of disease - necessary because this cannot be summed in next line
-idx = brady_sym_temp.index[brady_sym_temp.isnull().all(1)] # Get idx of where all column values of the same row are nan - this is because these will fill in as 0 when in reality they aren't zero they should be nans
-x = brady_sym_temp.fillna(0) # because adding 1 plus nan equals nan
-ppmi_merge['Brady.Rigidity.Subscore-sym'] = x['Rigidity.Neck.UPDRS3.Num'] + (x['Rigidity.RUE.UPDRS3.Num'] + x['Rigidity.LUE.UPDRS3.Num'])/2 + (x['Rigidity.RLE.UPDRS3.Num'] + x['Rigidity.LLE.UPDRS3.Num'])/2  + x['Rigidity.Neck.UPDRS3A.Num']+ (x['Rigidity.RUE.UPDRS3A.Num']+ x['Rigidity.LUE.UPDRS3A.Num'])/2 + (x['Rigidity.RLE.UPDRS3A.Num'] +x['Rigidity.LLE.UPDRS3A.Num'])/2 + x['Rigidity.Neck.UPDR3ON.Num'] + (x['Rigidity.RUE.UPDR3ON.Num'] +x['Rigidity.LUE.UPDR3ON.Num'])/2 + (x['Rigidity.RLE.UPDR3ON.Num']+x['Rigidity.LLE.UPDR3ON.Num'])/2 + x['Rigidity.Neck.UPDR3OF.Num']+ (x['Rigidity.RUE.UPDR3OF.Num']+ x['Rigidity.LUE.UPDR3OF.Num'])/2 + (x['Rigidity.RLE.UPDR3OF.Num']+x ['Rigidity.LLE.UPDR3OF.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDRS3.Num'] +x['Finger.Tapping.Left.Hand.UPDRS3.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDRS3A.Num'] +x['Finger.Tapping.Left.Hand.UPDRS3A.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDR3ON.Num'] + x['Finger.Tapping.Left.Hand.UPDR3ON.Num'])/2 + (x['Finger.Tapping.Right.Hand.UPDR3OF.Num'] +x['Finger.Tapping.Left.Hand.UPDR3OF.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDRS3.Num']+x['Hand.Movements.Left.Hand.UPDRS3.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDRS3A.Num']+x['Hand.Movements.Left.Hand.UPDRS3A.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDR3ON.Num']+x['Hand.Movements.Left.Hand.UPDR3ON.Num'])/2 + (x['Hand.Movements.Right.Hand.UPDR3OF.Num']+x['Hand.Movements.Left.Hand.UPDR3OF.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDRS3.Num']+x['Pronation.Supination.Left.Hand.UPDRS3.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDRS3A.Num']+x ['Pronation.Supination.Left.Hand.UPDRS3A.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDR3ON.Num']+x ['Pronation.Supination.Left.Hand.UPDR3ON.Num'])/2 + (x['Pronation.Supination.Right.Hand.UPDR3OF.Num']+x['Pronation.Supination.Left.Hand.UPDR3OF.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDRS3.Num']+x ['Toe.Tapping.Left.Foot.UPDRS3.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDRS3A.Num'] +x['Toe.Tapping.Left.Foot.UPDRS3A.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDR3OF.Num'] +x['Toe.Tapping.Left.Foot.UPDR3OF.Num'])/2 + (x['Toe.Tapping.Right.Foot.UPDR3ON.Num'] +x['Toe.Tapping.Left.Foot.UPDR3ON.Num'])/2 +  (x['Leg.Agility.Right.Leg.UPDRS3.Num']+ x['Leg.Agility.Left.Leg.UPDRS3.Num'])/2+ (x['Leg.Agility.Right.Leg.UPDRS3A.Num']+ x['Leg.Agility.Left.Leg.UPDRS3A.Num'])/2 + (x['Leg.Agility.Right.Leg.UPDR3ON.Num']+ x['Leg.Agility.Left.Leg.UPDR3ON.Num'])/2+ (x['Leg.Agility.Right.Leg.UPDR3OF.Num']+ x['Leg.Agility.Left.Leg.UPDR3OF.Num'])/2
-ppmi_merge['Brady.Rigidity.Subscore-sym'].iloc[idx] = np.nan # Fill in subscores that should be nans as nan
+ppmi_merge = add_lateralized_subscores(ppmi_merge, brady_sym, 'Symmetric', 'Brady.Rigidity.Subscore-sym' )
 
 # Combine left and right and sym subscores into same column 
 ppmi_merge["Brady.Rigidity.Subscore.lateralized"] = ppmi_merge.pop("Brady.Rigidity.Subscore-right").fillna(ppmi_merge.pop("Brady.Rigidity.Subscore-left"))
@@ -872,21 +791,12 @@ tremor_left = ['Dominant.Side.Disease', 'Tremor.UPDRS2.Num', 'Postural.Tremor.Le
 tremor_sym = ['Dominant.Side.Disease', 'Tremor.UPDRS2.Num', 'Postural.Tremor.Right.Hand.UPDRS3.Num', 'Postural.Tremor.Left.Hand.UPDRS3.Num', 'Postural.Tremor.Right.Hand.UPDRS3A.Num', 'Postural.Tremor.Left.Hand.UPDRS3A.Num', 'Postural.Tremor.Right.Hand.UPDR3OF.Num', 'Postural.Tremor.Left.Hand.UPDR3OF.Num', 'Postural.Tremor.Right.Hand.UPDR3ON.Num', 'Postural.Tremor.Left.Hand.UPDR3ON.Num', 'Kinetic.Tremor.Right.Hand.UPDRS3.Num', 'Kinetic.Tremor.Left.Hand.UPDRS3.Num', 'Kinetic.Tremor.Right.Hand.UPDRS3A.Num', 'Kinetic.Tremor.Left.Hand.UPDRS3A.Num', 'Kinetic.Tremor.Right.Hand.UPDR3OF.Num', 'Kinetic.Tremor.Left.Hand.UPDR3OF.Num', 'Kinetic.Tremor.Right.Hand.UPDR3ON.Num', 'Kinetic.Tremor.Left.Hand.UPDR3ON.Num', 'Rest.Tremor.Amplitude.RUE.UPDRS3.Num', 'Rest.Tremor.Amplitude.LUE.UPDRS3.Num', 'Rest.Tremor.Amplitude.RLE.UPDRS3.Num', 'Rest.Tremor.Amplitude.LLE.UPDRS3.Num', 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3.Num', 'Rest.Tremor.Amplitude.RUE.UPDRS3A.Num', 'Rest.Tremor.Amplitude.LUE.UPDRS3A.Num', 'Rest.Tremor.Amplitude.RLE.UPDRS3A.Num', 'Rest.Tremor.Amplitude.LLE.UPDRS3A.Num', 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3A.Num', 'Rest.Tremor.Amplitude.RUE.UPDR3OF.Num', 'Rest.Tremor.Amplitude.LUE.UPDR3OF.Num', 'Rest.Tremor.Amplitude.RLE.UPDR3OF.Num', 'Rest.Tremor.Amplitude.LLE.UPDR3OF.Num', 'Rest.Tremor.Amplitude.Lip.Jaw.UPDR3OF.Num', 'Rest.Tremor.Amplitude.RUE.UPDR3ON.Num', 'Rest.Tremor.Amplitude.LUE.UPDR3ON.Num', 'Rest.Tremor.Amplitude.RLE.UPDR3ON.Num', 'Rest.Tremor.Amplitude.LLE.UPDR3ON.Num', 'Rest.Tremor.Amplitude.Lip.Jaw.UPDR3ON.Num', 'Constancy.of.Rest.Tremor.UPDRS3.Num', 'Constancy.of.Rest.Tremor.UPDRS3A.Num', 'Constancy.of.Rest.Tremor.UPDR3OF.Num', 'Constancy.of.Rest.Tremor.UPDR3ON.Num']
 ppmi_merge = add_lateralized_subscores(ppmi_merge, tremor_left, 'Left', 'Tremor.Subscore-left')
 ppmi_merge = add_lateralized_subscores(ppmi_merge, tremor_right, 'Right', 'Tremor.Subscore-right')
-
-## TREMOR SYM
-tremor_only_sym = ppmi_merge[tremor_sym] # Get dataframe of only columns in tremor_left
-ppmi_merge['Tremor.Subscore-sym'] = 0 # Initialize lateralized variable
-tremor_only_sym.loc[tremor_only_sym['Dominant.Side.Disease'] != 'Symmetric', : ] = np.nan # Make all rows nan if dominant side of disease is not left 
-tremor_sym_temp= tremor_only_sym.drop('Dominant.Side.Disease', 1)
-idx = tremor_sym_temp.index[tremor_sym_temp.isnull().all(1)]
-x = tremor_sym_temp
-x = x.fillna(0) # because adding 1 plus nan equals nan
-ppmi_merge['Tremor.Subscore-sym'] = x['Tremor.UPDRS2.Num'] +  (x['Postural.Tremor.Right.Hand.UPDRS3.Num']  + x['Postural.Tremor.Left.Hand.UPDRS3.Num'])/2 + (x['Postural.Tremor.Right.Hand.UPDRS3A.Num'] + x['Postural.Tremor.Left.Hand.UPDRS3A.Num'])/2 + (x['Postural.Tremor.Right.Hand.UPDR3OF.Num'] + x['Postural.Tremor.Left.Hand.UPDR3OF.Num'])/2 + (x['Postural.Tremor.Right.Hand.UPDR3ON.Num'] + x['Postural.Tremor.Left.Hand.UPDR3ON.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDRS3.Num'] + x['Kinetic.Tremor.Left.Hand.UPDRS3.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDRS3A.Num'] + x['Kinetic.Tremor.Left.Hand.UPDRS3A.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDR3OF.Num'] + x['Kinetic.Tremor.Left.Hand.UPDR3OF.Num'])/2 + (x['Kinetic.Tremor.Right.Hand.UPDR3ON.Num'] + x['Kinetic.Tremor.Left.Hand.UPDR3ON.Num'])/2 +  (x['Rest.Tremor.Amplitude.RUE.UPDRS3.Num']+ x['Rest.Tremor.Amplitude.LUE.UPDRS3.Num'])/2 + (x['Rest.Tremor.Amplitude.RLE.UPDRS3.Num'] +  x['Rest.Tremor.Amplitude.LLE.UPDRS3.Num'])/2 + x['Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3.Num'] + (x['Rest.Tremor.Amplitude.RUE.UPDRS3A.Num'] + x['Rest.Tremor.Amplitude.LUE.UPDRS3A.Num'])/2 + (x['Rest.Tremor.Amplitude.RLE.UPDRS3A.Num'] + x['Rest.Tremor.Amplitude.LLE.UPDRS3A.Num'])/2 + x['Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3A.Num'] + (x['Rest.Tremor.Amplitude.RUE.UPDR3OF.Num'] + x['Rest.Tremor.Amplitude.LUE.UPDR3OF.Num'])/2 + (x['Rest.Tremor.Amplitude.RLE.UPDR3OF.Num'] + x['Rest.Tremor.Amplitude.LLE.UPDR3OF.Num'])/2 +  x['Rest.Tremor.Amplitude.Lip.Jaw.UPDR3OF.Num'] + (x['Rest.Tremor.Amplitude.RUE.UPDR3ON.Num'] +  x['Rest.Tremor.Amplitude.LUE.UPDR3ON.Num'])/2 +  (x['Rest.Tremor.Amplitude.RLE.UPDR3ON.Num'] + x['Rest.Tremor.Amplitude.LLE.UPDR3ON.Num'])/2 + x['Rest.Tremor.Amplitude.Lip.Jaw.UPDR3ON.Num'] +  x['Constancy.of.Rest.Tremor.UPDRS3.Num'] + x['Constancy.of.Rest.Tremor.UPDRS3A.Num'] +  x['Constancy.of.Rest.Tremor.UPDR3OF.Num'] + x['Constancy.of.Rest.Tremor.UPDR3ON.Num']
-ppmi_merge['Tremor.Subscore-sym'].iloc[idx] = np.nan
+ppmi_merge = add_lateralized_subscores(ppmi_merge, tremor_sym, 'Symmetric', 'Tremor.Subscore-sym')
 
 # Combine left and right and sym scores into same column (.lateralized)
 ppmi_merge["Tremor.Subscore.lateralized"] = ppmi_merge.pop("Tremor.Subscore-right").fillna(ppmi_merge.pop("Tremor.Subscore-left"))
 ppmi_merge["Tremor.Subscore.lateralized"] = ppmi_merge.pop("Tremor.Subscore.lateralized").fillna(ppmi_merge.pop("Tremor.Subscore-sym"))
+
 lateralized_scores = ppmi_merge[['Subject.ID', 'Event.ID', 'Dominant.Side.Disease', 'Brady.Rigidity.Subscore.lateralized', 'Tremor.Subscore.lateralized']]
 ppmi_merge['Brady.Rigidity.Subscore.lateralized'] = lateralized_scores['Brady.Rigidity.Subscore.lateralized']
 ppmi_merge['Tremor.Subscore.lateralized'] = lateralized_scores['Tremor.Subscore.lateralized']
@@ -905,7 +815,6 @@ domsideisna = ppmi_merge['Dominant.Side.Disease'].isna()
 ppmi_merge['Dominant.Side.Disease'].loc[domsideisna] = 'Symmetric'
 
 ## Inlcude columns for bestEventID (bestScreening, bestBaseline, etc) and denote the highest resnetGrade with True (else = False)
-# BA edit
 myevs = ppmi_merge['Event.ID'].unique() # Unique event ids
 uids = ppmi_merge['Subject.ID'].unique() # Unique subject ids
 for myev in myevs : 
@@ -934,35 +843,35 @@ for myev in myevs :
 
 # DX simplified column 
 ppmi_merge['DXsimplified'] = '' # Initialize DXsimplfied
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == 'Healthy Control','DXsimplified'] = 'HC'  
-ppmi_merge.loc[ppmi_merge['Enroll.Diagnosis'] == 'Healthy Control','DXsimplified'] = 'HC'  
-ppmi_merge.loc[ppmi_merge['Enroll.Diagnosis'] == 'Parkinson\'s Disease','DXsimplified'] = 'Sporadic_PD'  
-ppmi_merge.loc[ppmi_merge['Enroll.Diagnosis'] == 'SWEDD','DXsimplified'] = "nonPDorMSA"  
-ppmi_merge.loc[ppmi_merge['Enroll.Diagnosis'] == "Prodromal",'DXsimplified'] = "Sporadic_Pro" 
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "GBA",'DXsimplified'] = "GBA_HC" 
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : GBA",'DXsimplified'] = "GBA_PD"
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : GBA not Prodromal",'DXsimplified'] = "GBA_PD"
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : GBA Prodromal",'DXsimplified'] = "GBA_Pro"
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2",'DXsimplified'] = "LRRK2_PD"
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2 + GBA",'DXsimplified'] = "LRRK2_PD"
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2 + GBA not Prodromal",'DXsimplified'] = "LRRK2_PD"
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2 + GBA Prodromal",'DXsimplified'] = "LRRK2_Pro"
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2 not Prodromal",'DXsimplified'] = "LRRK2_PD"
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2 Phenoconverted",'DXsimplified'] = "LRRK2_Pro"
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "Genetic : LRRK2 Prodromal",'DXsimplified'] = "LRRK2_Pro" 
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "Genetic : SNCA",'DXsimplified'] = "SNCA_PD" 
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : SNCA Prodromal",'DXsimplified'] = "SNCA_Pro" 
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Hyposmia" ,'DXsimplified'] = "Sporadic_Pro" 
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Hyposmia : Phenoconverted" ,'DXsimplified'] = "Sporadic_Pro" 
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "No Mutation not Prodromal" ,'DXsimplified'] = np.NaN
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "non-HC" ,'DXsimplified'] = np.NaN
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "non-PD",'DXsimplified'] = "nonPDorMSA" 
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "RBD",'DXsimplified'] = "Sporadic_Pro" 
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "RBD : Phenoconverted",'DXsimplified'] = "Sporadic_Pro" 
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "RBD : Phenoconverted with GBA",'DXsimplified'] = "GBA_Pro"
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "Sporadic" ,'DXsimplified'] = "Sporadic_PD"
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "SWEDD/non-PD Active"  ,'DXsimplified'] = "nonPDorMSA" 
-ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "SWEDD/PD Active"  ,'DXsimplified'] = np.NaN 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == 'Healthy Control', 'DXsimplified'] = 'HC'  
+ppmi_merge.loc[ppmi_merge['Enroll.Diagnosis'] == 'Healthy Control', 'DXsimplified'] = 'HC'  
+ppmi_merge.loc[ppmi_merge['Enroll.Diagnosis'] == 'Parkinson\'s Disease', 'DXsimplified'] = 'Sporadic_PD'  
+ppmi_merge.loc[ppmi_merge['Enroll.Diagnosis'] == 'SWEDD', 'DXsimplified'] = "nonPDorMSA"  
+ppmi_merge.loc[ppmi_merge['Enroll.Diagnosis'] == "Prodromal", 'DXsimplified'] = "Sporadic_Pro" 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "GBA", 'DXsimplified'] = "GBA_HC" 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : GBA", 'DXsimplified'] = "GBA_PD"
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : GBA not Prodromal", 'DXsimplified'] = "GBA_PD"
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : GBA Prodromal", 'DXsimplified'] = "GBA_Pro"
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2", 'DXsimplified'] = "LRRK2_PD"
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2 + GBA", 'DXsimplified'] = "LRRK2_PD"
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2 + GBA not Prodromal", 'DXsimplified'] = "LRRK2_PD"
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2 + GBA Prodromal", 'DXsimplified'] = "LRRK2_Pro"
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2 not Prodromal", 'DXsimplified'] = "LRRK2_PD"
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : LRRK2 Phenoconverted", 'DXsimplified'] = "LRRK2_Pro"
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "Genetic : LRRK2 Prodromal", 'DXsimplified'] = "LRRK2_Pro" 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "Genetic : SNCA", 'DXsimplified'] = "SNCA_PD" 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Genetic : SNCA Prodromal", 'DXsimplified'] = "SNCA_Pro" 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Hyposmia" , 'DXsimplified'] = "Sporadic_Pro" 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "Hyposmia : Phenoconverted", 'DXsimplified'] = "Sporadic_Pro" 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "No Mutation not Prodromal", 'DXsimplified'] = np.NaN
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "non-HC", 'DXsimplified'] = np.NaN
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "non-PD", 'DXsimplified'] = "nonPDorMSA" 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "RBD", 'DXsimplified'] = "Sporadic_Pro" 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] == "RBD : Phenoconverted", 'DXsimplified'] = "Sporadic_Pro" 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "RBD : Phenoconverted with GBA", 'DXsimplified'] = "GBA_Pro"
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "Sporadic", 'DXsimplified'] = "Sporadic_PD"
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "SWEDD/non-PD Active", 'DXsimplified'] = "nonPDorMSA" 
+ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "SWEDD/PD Active", 'DXsimplified'] = np.NaN 
 
 ## Add in Visit column - BA edits 
 ppmi_merge['Visit'] = np.NaN # Initialize Visit col
