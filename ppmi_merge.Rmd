@@ -35,7 +35,6 @@ invicro_data_path =  userdir
 genetics_path = userdir + 'genetic_data/'
 
 #### CLINICAL INFO ####
-## Create the initial dataframe with the subjects listed in Consensus_Committee_Analytic_Datasets_28OCT21.xlsx 
 xlsx = pd.ExcelFile(ppmi_download_path + 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx') # Read in main xlsx file 
 
 def create_cohort_df(xlsx, sheet) : 
@@ -859,7 +858,7 @@ ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "Sporadic", 'DXsimplified'] =
 ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "SWEDD/non-PD Active", 'DXsimplified'] = "nonPDorMSA" 
 ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "SWEDD/PD Active", 'DXsimplified'] = np.NaN 
 
-## Add in Visit column - BA edits 
+## Add in Visit column 
 ppmi_merge['Visit'] = np.NaN # Initialize Visit col
 searchfor = ['Baseline', 'Visit Month '] # Strings to search for 
 temp = ppmi_merge['Event.ID'].str.contains('|'.join(searchfor)) # locations of where row contains str: baseline or visit month 
