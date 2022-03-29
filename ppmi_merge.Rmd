@@ -858,6 +858,33 @@ ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "Sporadic", 'DXsimplified'] =
 ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "SWEDD/non-PD Active", 'DXsimplified'] = "nonPDorMSA" 
 ppmi_merge.loc[ppmi_merge['Consensus.Subtype'] ==  "SWEDD/PD Active", 'DXsimplified'] = np.NaN 
 
+## Add in min PD Disease duration
+# Create a simplified diagnosis group of just HC, PD, Prodromal, or nonPDorMSA
+ppmi_merge['DXs2'] = '' 
+ppmi_merge['DXsimplified'].fillna('NA', inplace = True)
+ppmi_merge.loc[ppmi_merge['DXsimplified'].str.contains('HC'), 'DXs2'] = 'HC'
+ppmi_merge.loc[ppmi_merge['DXsimplified'].str.contains('_PD'), 'DXs2'] = 'PD'
+ppmi_merge.loc[ppmi_merge['DXsimplified'].str.contains('_Pro'), 'DXs2'] = 'Pro'
+ppmi_merge.loc[ppmi_merge['DXsimplified'].str.contains('nonPDorMSA'), 'DXs2'] = 'nonPDorMSA'
+
+# If HC, Prodromal or nonPDorMSA - fill in with 0 for PD.Min.Disease.Duration
+ppmi_merge.loc[ppmi_merge['DXs2'] == 'HC', 'PD.Min.Disease.Duration'] = 0 
+ppmi_merge.loc[ppmi_merge['DXs2'] == 'Pro', 'PD.Min.Disease.Duration'] = 0 
+ppmi_merge.loc[ppmi_merge['DXs2'] == 'nonPDorMSA', 'PD.Min.Disease.Duration'] = 0 
+
+# For PD subjects, fill in PD.Min.Disease.Duration
+print(ppmi_merge['PD.Diagnosis.Duration'])
+ppmi_merge.to_csv('/Users/areardon/Desktop/ppmi_merge1.csv')
+ppmi_merge['PD.Diagnosis.Duration'].fillna('', inplace = True)
+
+uids = ppmi_merge['Subject.ID'].unique() # Unique subject ids
+for u in uids : 
+    ww = ppmi_merge[(ppmi_merge['Subject.ID'] == u) & (ppmi_merge['DXs2'] == 'PD') & (ppmi_merge['PD.Diagnosis.Duration'] != '')]
+    if len(ww) > 0 : 
+        print(ww['PD.Diagnosis.Duration'])
+        mydd = min(ww['PD.Diagnosis.Duration'])
+        ppmi_merge.loc[ppmi_merge['Subject.ID'] == u, 'PD.Min.Disease.Duration'] = mydd
+
 ## Add in Visit column 
 ppmi_merge['Visit'] = np.NaN # Initialize Visit col
 searchfor = ['Baseline', 'Visit Month '] # Strings to search for 
