@@ -110,9 +110,9 @@ we try to use descriptive names - details are available for most from the LONI w
 
 ## how to use this file
 
-1.  select the cohort based on one of the diagnostic columns `DX4cat` `DXsimplified` `Consensus.Subtype` or `Consensus.Diagnosis` - potentially only use the `Analytic.Cohort` subjects.
-2.  associate some outcome with diagnosis, while controlling for Age Sex and potentially `brainVol` if using imaging data.
-3.  education and disease duration might also be considered important covariates.
+1.  Select the cohort based on one of the diagnostic columns `DX4cat` `DXsimplified` `Consensus.Subtype` or `Consensus.Diagnosis` - potentially only use the `Analytic.Cohort` subjects.
+2.  Associate some outcome with diagnosis, while controlling for Age Sex and potentially `brainVol` if using imaging data.
+3.  Education and disease duration might also be considered important covariates.
 4.  Consider the time variable if doing longitudinal analysis.
 5.  Consider the values of `resnetGrade` if using imaging; e.g. reject data with grade less than 0.75 or 1.25 ( F and C respectively ).
 6.  Medication status can be important for looking at assessments related to motor function: e.g. use `On.PD.Treatment.UPDRS3.Cat` as a covariate.
