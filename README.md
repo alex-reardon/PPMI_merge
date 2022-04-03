@@ -46,7 +46,7 @@ References to include :
 6.) QC : in preparation
 
 
-## column names
+## Column names
 
 we try to use descriptive names - details are available for most from the LONI website.
 
@@ -85,7 +85,7 @@ we try to use descriptive names - details are available for most from the LONI w
 | right subiculum |
 
 
-* for cit 168 regions, we have ( noting that regions vary greatly in size/reliability ) :
+* For cit 168 regions, we have ( noting that regions vary greatly in size/reliability ) :
 
 | short name | anatomy         |
 |--------------|--------------|
@@ -108,7 +108,7 @@ we try to use descriptive names - details are available for most from the LONI w
 
 
 
-## how to use this file
+## How to use this file
 
 1.  Select the cohort based on one of the diagnostic columns `DX4cat` `DXsimplified` `Consensus.Subtype` or `Consensus.Diagnosis` - potentially only use the `Analytic.Cohort` subjects.
 2.  Associate some outcome with diagnosis, while controlling for Age Sex and potentially `brainVol` if using imaging data.
