@@ -48,7 +48,7 @@ References to include :
 
 ## Column names
 
-we try to use descriptive names - details are available for most from the LONI website.
+We try to use descriptive names - details are available for most from the LONI website.
 
 * Age is estimated to within a month accuracy for the visit date
 
@@ -62,11 +62,11 @@ we try to use descriptive names - details are available for most from the LONI w
 
 * `Analytic_Cohort` denotes whether the subject/visit is designated a member of the official PPMI analytic cohort.
 
-* brain related variables are denoted with left / right as well as 
+* Brain related variables are denoted with left / right as well as 
     * area, thk (thickness ) or vol (volume)
     * DSD (instead of left/right) indicates dominant side disease
 
-* for mtl regions, we have (EC is entorhinal cortex):
+* For mtl regions, we have (EC is entorhinal cortex):
 
 | anatomy         |
 |--------------|
