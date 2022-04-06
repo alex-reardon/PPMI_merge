@@ -32,25 +32,26 @@ from dateutil import relativedelta
 ## PPMI Study Data path 
 userdir = '/Users/areardon/Desktop/ppmi_merge/'
 ppmi_download_path = userdir + 'PPMI_Study_Data_Download/'
-invicro_data_path =  userdir 
+invicro_data_path = userdir 
 genetics_path = userdir + 'genetic_data/'
+version = '0.1' # File version to save as i.e. ppmi_merge_v0.1.csv
 
 #### CLINICAL INFO ####
 xlsx = pd.ExcelFile(ppmi_download_path + 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx') # Read in main xlsx file 
 
 def create_cohort_df(xlsx, sheet) : 
     cohort_df = pd.read_excel(xlsx, sheet)
-    cols_delete = ['Unnamed', 'CONDATE'] # Columns to remove from sheet/ df
+    cols_delete = ['Unnamed', 'CONDATE'] # Columns to remove from sheet/df
     cohort_df = cohort_df.loc[:, ~cohort_df.columns.str.startswith(tuple(cols_delete))] # Remove columns in cols_delete
 
     # Create new columns for Enrollment.Subtype and Consensus.Subtype in pd_df 
-    cohort_df["Enrollment.Subtype"] = '' # Create new column called 'Enrollment.Subtype' in pd_df
-    cohort_df["Consensus.Subtype"] = '' # Create new column called 'Consensus.Subtype' in pd_df
+    cohort_df["Enrollment.Subtype"] = '' # Create new column called 'Enrollment.Subtype' in cohort_df
+    cohort_df["Consensus.Subtype"] = '' # Create new column called 'Consensus.Subtype' in cohort_df
 
     if sheet == 'HC' : 
         cohort_df['Subgroup'] = 'Healthy Control'
     if sheet == 'SWEDD' : 
-        cohort_df['Comments'] = '' 
+        cohort_df['Comments'] = '' # Replace comments with empty string because we don't want to merge comments for SWEDD sheet
 
     return cohort_df
 
@@ -60,7 +61,7 @@ def merge_columns(df : pd.DataFrame , old_df_columns : list, new_df_column_name 
     empty/nan column entries.  
     """
     df = df.replace(r'^\s*$', np.NaN, regex=True) # Fill in empty cells with nan
-    df[new_df_column_name] = df[old_df_columns].agg(lambda x: x.dropna().str.cat(sep= separator), axis=1) # Combine columns
+    df[new_df_column_name] = df[old_df_columns].agg(lambda x: x.dropna().str.cat(sep = separator), axis = 1) # Combine columns
     df.drop(old_df_columns, axis = 1, inplace = True)
     return df 
 
@@ -68,10 +69,10 @@ def getNamesFromDataframe(df, str) :
     col_names = [col for col in df.columns if str in col]
     return col_names
 
-def merge_new_csv(df, csv_filename, list_cols) : 
-    demo_df = pd.read_csv(ppmi_download_path + csv_filename)
+def merge_new_csv(df, csv_filename, list_cols, merge_on, merge_how) : 
+    demo_df = pd.read_csv(ppmi_download_path + csv_filename, skipinitialspace = True)
     demo_df = demo_df[list_cols]
-    ppmi_merge = pd.merge(df, demo_df, on = ['PATNO', 'EVENT_ID'], how = "outer") # Merge
+    ppmi_merge = pd.merge(df, demo_df, on = merge_on, how = merge_how) # Merge
     return ppmi_merge
 
 def isNaN(num):
@@ -80,7 +81,7 @@ def isNaN(num):
 def decode_0_1_no_yes(df, list) : 
     for i in list :
         df[i] = df[i].astype(int, errors = "ignore")
-        df[i].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True)
+        df[i].replace({0 : 'No' , 1 : 'Yes', 2 : 'Uncertain'}, inplace = True) # FIXME replace Uncertain with NA ?
     return df 
 
 def decode_none2severe(df, list): 
@@ -89,11 +90,17 @@ def decode_none2severe(df, list):
         df[i].replace({0 : 'None', 1 : 'Slight', 2: 'Mild', 3 : 'Moderate', 4 : 'Severe'}, inplace = True) 
     return df 
 
+def condensed_df(df, keep_col_list, rename_col_dict, drop_col_list) : 
+    new_df = df[keep_col_list]
+    new_df.rename(columns = rename_col_dict, inplace = True)
+    new_df.dropna(subset = drop_col_list, inplace = True)
+    return new_df
+
 # Create cohort df 
 pd_df = create_cohort_df(xlsx, 'PD') # Create Parkinson's Disease data frame from 'PD' sheet in 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
-prodromal_df = create_cohort_df(xlsx, 'Prodromal')
-hc_df = create_cohort_df(xlsx, 'HC')
-swedd_df = create_cohort_df(xlsx, 'SWEDD') # SWEDD subjects
+prodromal_df = create_cohort_df(xlsx, 'Prodromal')# Create Prodromal data frame from 'PD' sheet in 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
+hc_df = create_cohort_df(xlsx, 'HC')# Create HC data frame from 'PD' sheet in 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
+swedd_df = create_cohort_df(xlsx, 'SWEDD') # Create SWEDD data frame from 'PD' sheet in 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
 
 # Decode Enrollment.Subtype ('Summary' sheet) and Consensus.Subtype ('Summary Analytic' sheet) of 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
 pd_df.loc[(pd_df['ENRLPD'] == 1) & (pd_df['ENRLLRRK2'] == 0) & (pd_df['ENRLGBA'] == 0) & (pd_df['ENRLSNCA'] == 0), 'Enrollment.Subtype'] = '' # Sporadic - don't need to define here bc already covered in 'Subgroup' column in PD sheet
@@ -105,7 +112,7 @@ pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2']== 1) & (pd_df['CONGBA'] == 
 pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2'] == 0) & (pd_df['CONGBA'] == 1) & (pd_df['CONSNCA'] == 0) , 'Consensus.Subtype'] = 'Genetic : GBA'
 pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2'] == 1) & (pd_df['CONGBA'] == 1) & (pd_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2 + GBA'
 pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2'] == 0) & (pd_df['CONGBA'] == 0) & (pd_df['CONSNCA'] == 1) , 'Consensus.Subtype'] = 'Genetic : SNCA'
-pd_df.loc[(pd_df['CONPD'] == 0) & (pd_df['CONPROD']== 0) , 'Consensus.Subtype'] = 'non-PD'
+pd_df.loc[(pd_df['CONPD'] == 0) & (pd_df['CONPROD']== 0) , 'Consensus.Subtype'] = 'non-PD' # FIXME
 pd_df.loc[(pd_df['CONPD'] == 0) & (pd_df['CONPROD']== 1) & (pd_df['CONLRRK2'] == 1) & (pd_df['CONGBA'] == 0) & (pd_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2 Prodromal'
 pd_df.loc[(pd_df['CONPD'] == 0) & (pd_df['CONPROD'] == 1) & (pd_df['CONLRRK2'] == 0) & (pd_df['CONGBA'] == 1) & (pd_df['CONSNCA'] == 0) , 'Consensus.Subtype'] = 'Genetic : GBA Prodromal'
 
@@ -136,7 +143,7 @@ prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['CONRBD'] == 1) 
 prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['CONRBD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONGBA'] == 1), 'Consensus.Subtype' ] = 'RBD : Phenoconverted with GBA'
 
 # Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables for Healthy Control df 
-hc_df.loc[(hc_df['ENRLHC'] == 1), 'Enrollment.Subtype'] = ''
+hc_df.loc[(hc_df['ENRLHC'] == 1), 'Enrollment.Subtype'] = '' # Healthy Control already covered in Subgroup column 
 hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 0) & (hc_df['CONGBA'] == 0) & (hc_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Healthy Control'
 hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 1) & (hc_df['CONGBA'] == 0) & (hc_df['CONSNCA'] == 0),'Consensus.Subtype'] = 'LRRK2'
 hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 0) & (hc_df['CONGBA'] == 1) & (hc_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'GBA'
@@ -149,7 +156,7 @@ swedd_df.loc[swedd_df['ENRLSWEDD'] == 1 , 'Enrollment.Subtype'] =  'SWEDD Legacy
 swedd_df.loc[swedd_df['CONSWEDD'] == 0 , 'Consensus.Subtype'] = 'SWEDD/PD Active'
 swedd_df.loc[swedd_df['CONSWEDD'] == 1 ,'Consensus.Subtype'] =  'SWEDD/non-PD Active'
 
-# Merge the four dataframes (HC, Prodromal, PD, SWEDD)
+# Merge the four cohort dataframes (HC, Prodromal, PD, SWEDD)
 full_df = pd_df.append([prodromal_df, hc_df, swedd_df]) # Concat all 4 cohort dfs
 
 # Decode and re-organize full_df
@@ -159,8 +166,7 @@ full_df['CONHC'].replace({1 : 'Healthy Control',  0 : ''}, inplace = True)
 full_df['CONSWEDD'].replace({1 : 'SWEDD',  0 : 'SWEDD/PD'}, inplace = True) 
 full_df['Comments'].replace({'MSA' : 'Multiple System Atrophy'}, inplace = True)
 full_df = decode_0_1_no_yes(full_df, ['PHENOCNV'])
-full_df = merge_columns(full_df, ['CONPD', 'CONPROD', 'CONHC', 'CONSWEDD'], 'Consensus.Diagnosis_temp', ', ') # Get one column for Consensus Diagnosis called Consensus.Diagnosis_temp
-full_df = merge_columns(full_df, ['Consensus.Diagnosis_temp', 'Comments'], 'Consensus.Diagnosis', ': ') # Include the 'Comments' column in with Consensus.Diagnosis_temp into a new column called 'Consensus.Diagnosis'
+full_df = merge_columns(full_df, ['CONPD', 'CONPROD', 'CONHC', 'CONSWEDD','Comments'], 'Consensus.Diagnosis', ': ') # Get one column for Consensus Diagnosis with comments merged in 
 full_df = merge_columns(full_df, ['Subgroup', 'Enrollment.Subtype'], 'Enroll.Subtype', '') # Get one column for Enroll.Subtype
 full_df = full_df.loc[:, ~full_df.columns.str.startswith(tuple(['CON','ENRL']))] # Remove columns that begin with CON and ENRL
 full_df.rename(columns = {'Cohort' : 'Enroll.Diagnosis' , 'PHENOCNV' : 'Subject.Phenoconverted'}, inplace = True)
@@ -168,18 +174,16 @@ full_df = full_df[['PATNO', 'Enroll.Diagnosis', 'Enroll.Subtype', 'Consensus.Dia
 analytic_cohort_subids = full_df['PATNO'].unique() # subids for analytic cohort 
 
 ## Add in age info at each visit 
-age_df = pd.read_csv(ppmi_download_path + 'Age_at_visit.csv', skipinitialspace = True) # Age info
-age_df.rename(columns = {'AGE_AT_VISIT' : 'Age'}, inplace = True) # Rename column 
-ppmi_merge = pd.merge(full_df, age_df, on = 'PATNO', how = "outer") # Merge full_df with age_df
-ppmi_merge['EVENT_ID'].fillna('LOG', inplace = True) # Replace nan cells with 'LOG' in EVENT_ID column -- FIXME (not sure if I should fill this with LOG)-subject 41358 
+ppmi_merge = merge_new_csv(full_df, 'Age_at_visit.csv', ['PATNO', 'EVENT_ID', 'AGE_AT_VISIT'], merge_on = ['PATNO'], merge_how = "outer")
+ppmi_merge['EVENT_ID'].fillna('SC', inplace = True) # One subject (41358) has event_id as NaN - replace with 'SC' because later has a screening event id that we will merge info on for this sub 
 
-## Add deographics, vital signs, and pd diagnosis history info 
-ppmi_merge = merge_new_csv(ppmi_merge, 'Demographics.csv', ['PATNO','EVENT_ID','SEX', 'HANDED', 'BIRTHDT','AFICBERB','ASHKJEW','BASQUE','HISPLAT','RAASIAN','RABLACK','RAHAWOPI','RAINDALS','RANOS','RAWHITE']) # Bday, sex, handedness, race
-ppmi_merge = merge_new_csv(ppmi_merge, 'Vital_Signs.csv', ['PATNO','EVENT_ID','INFODT', 'WGTKG', 'HTCM']) # Visit date, weight and height 
-ppmi_merge = merge_new_csv(ppmi_merge,  'PD_Diagnosis_History.csv', ['PATNO', 'EVENT_ID', 'SXDT','PDDXDT']) # First symptom date, PD diagnosis date 
+## Add demographics, vital signs, and pd diagnosis history info 
+ppmi_merge = merge_new_csv(ppmi_merge, 'Demographics.csv', ['PATNO','EVENT_ID','SEX', 'HANDED', 'BIRTHDT','AFICBERB','ASHKJEW','BASQUE','HISPLAT','RAASIAN','RABLACK','RAHAWOPI','RAINDALS','RANOS','RAWHITE'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # Bday, sex, handedness, race
+ppmi_merge = merge_new_csv(ppmi_merge, 'Vital_Signs.csv', ['PATNO','EVENT_ID','INFODT', 'WGTKG', 'HTCM'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # Visit date, weight and height 
+ppmi_merge = merge_new_csv(ppmi_merge,  'PD_Diagnosis_History.csv', ['PATNO', 'EVENT_ID', 'SXDT','PDDXDT'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # First symptom date, PD diagnosis date 
 ppmi_merge['SEX'].replace({0 : 'Female', 1 : 'Male' }, inplace = True) # Decode sex 
 ppmi_merge['HANDED'].replace({1 : 'Right', 2 : 'Left', 3 : 'Mixed' }, inplace = True) # Decode handedness
-ppmi_merge.rename(columns = {'SEX' : 'Sex', 'HANDED' : 'Handed', 'BIRTHDT' : 'BirthDate', 'WGTKG' : 'Weight(kg)', 'HTCM' : 'Height(cm)', 'SXDT' : 'First.Symptom.Date', 'PDDXDT': 'PD.Diagnosis.Date', 'AFICBERB' : 'African.Berber.Race','ASHKJEW':'Ashkenazi.Jewish.Race', 'BASQUE' : 'Basque.Race', 'HISPLAT' : 'Hispanic.Latino.Race', 'RAASIAN' : 'Asian.Race', 'RABLACK' : 'African.American.Race', 'RAHAWOPI' : 'Hawian.Other.Pacific.Islander.Race', 'RAINDALS' : 'Indian.Alaska.Native.Race', 'RANOS' : 'Not.Specified.Race', 'RAWHITE': 'White.Race'}, inplace = True) # Rename columns
+ppmi_merge.rename(columns = {'AGE_AT_VISIT' : 'Age', 'SEX' : 'Sex', 'HANDED' : 'Handed', 'BIRTHDT' : 'BirthDate', 'WGTKG' : 'Weight(kg)', 'HTCM' : 'Height(cm)', 'SXDT' : 'First.Symptom.Date', 'PDDXDT': 'PD.Diagnosis.Date', 'AFICBERB' : 'African.Berber.Race','ASHKJEW':'Ashkenazi.Jewish.Race', 'BASQUE' : 'Basque.Race', 'HISPLAT' : 'Hispanic.Latino.Race', 'RAASIAN' : 'Asian.Race', 'RABLACK' : 'African.American.Race', 'RAHAWOPI' : 'Hawian.Other.Pacific.Islander.Race', 'RAINDALS' : 'Indian.Alaska.Native.Race', 'RANOS' : 'Not.Specified.Race', 'RAWHITE': 'White.Race'}, inplace = True) # Rename columns
 
 ## Add a PD.Disease.Duration variable (in years)
 ppmi_merge['PD.Diagnosis.Duration'] = '' # Initialize PD.Diagnosis.Duration variable
@@ -189,24 +193,18 @@ for row_num in range(len(ppmi_merge['PD.Diagnosis.Date'])) :
         diag_month = int(ppmi_merge['PD.Diagnosis.Date'].loc[row_num].split('/')[0]) # Diagnosis month
         event_year = int(ppmi_merge['INFODT'].loc[row_num].split('/')[1]) # Visit date year 
         event_month = int(ppmi_merge['INFODT'].loc[row_num].split('/')[0]) # Visit date month
-        diff = relativedelta.relativedelta(datetime(event_year, event_month, 1), datetime(diag_year, diag_month, 1)) # FIXME ASSUMPTION visit date was the first of the month, diagnosis date was the first of the month
+        diff = relativedelta.relativedelta(datetime(event_year, event_month, 1), datetime(diag_year, diag_month, 1)) # FIXME ASSUMPTION visit date and diagnosis date was the first of the month
         ppmi_merge['PD.Diagnosis.Duration'].iloc[row_num] = ((diff.years)*12 + diff.months)/12 # PD.Diagnosis.Duration in years
 
 # Add Final (FNL) Event ID and info 
-ppmi_merge = merge_new_csv(ppmi_merge, 'Conclusion_of_Study_Participation.csv', ['PATNO', 'EVENT_ID', 'COMPLT', 'WDRSN', 'WDDT']) # completed study, whithdrawal reason, withdrawal date  
+ppmi_merge = merge_new_csv(ppmi_merge, 'Conclusion_of_Study_Participation.csv', ['PATNO', 'EVENT_ID', 'COMPLT', 'WDRSN', 'WDDT'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # completed study, whithdrawal reason, withdrawal date  
 ppmi_merge = decode_0_1_no_yes(ppmi_merge, ['COMPLT'])
-ppmi_merge['WDRSN'].replace({1 : 'Adverse Event', 2 : 'Completed study per protocol',3 : 'Death', 4 : 'Family, care-partner, or social issues', 5 : 'Lost to follow up', 6 : 'Non-compliance with study procedures' , 7 : 'Transportation/Travel issues' , 8 : 'Institutionalized' , 9 : 'Subject transitioning to a new cohort' , 10 : 'Subject withdrew consent', 11 : 'Investigator decision', 12 : 'Sponsor decision', 13 : 'Informant/caregiver decision' , 20 : 'Other'}, inplace = True) 
+ppmi_merge['WDRSN'].replace({1 : 'Adverse Event', 2 : 'Completed study per protocol', 3 : 'Death', 4 : 'Family, care-partner, or social issues', 5 : 'Lost to follow up', 6 : 'Non-compliance with study procedures' , 7 : 'Transportation/Travel issues' , 8 : 'Institutionalized' , 9 : 'Subject transitioning to a new cohort' , 10 : 'Subject withdrew consent', 11 : 'Investigator decision', 12 : 'Sponsor decision', 13 : 'Informant/caregiver decision' , 20 : 'Other'}, inplace = True) 
 ppmi_merge.rename(columns = {'COMPLT' : 'Completed.Study' , 'WDRSN': 'Reason.for.Withdrawal','WDDT' : 'Withdrawal.Date'}, inplace = True)
 
 ## Add diagnosis change info on event id 
-def condensed_df(df, keep_col_list, rename_col_dict, drop_col_list) : 
-    new_df = df[keep_col_list]
-    new_df.rename(columns = rename_col_dict, inplace = True)
-    new_df.dropna(subset = drop_col_list, inplace = True)
-    return new_df
-
-diag_vis1 = condensed_df(full_df,['PATNO', 'DIAG1', 'DIAG1VIS'],  {'DIAG1VIS' : 'EVENT_ID'}, ['EVENT_ID'])
-diag_vis2 = condensed_df(full_df, ['PATNO', 'DIAG2', 'DIAG2VIS'],  {'DIAG2VIS' : 'EVENT_ID'},['EVENT_ID'])
+diag_vis1 = condensed_df(full_df, ['PATNO', 'DIAG1', 'DIAG1VIS'], {'DIAG1VIS' : 'EVENT_ID'}, ['EVENT_ID'])
+diag_vis2 = condensed_df(full_df, ['PATNO', 'DIAG2', 'DIAG2VIS'], {'DIAG2VIS' : 'EVENT_ID'},['EVENT_ID'])
 ppmi_merge.drop(['DIAG1', 'DIAG1VIS', 'DIAG2', 'DIAG2VIS'], axis = 1, inplace = True) # Drop these from ppmi_merge so there aren't duplicates when we merge the diag_vis dfs
 ppmi_merge = pd.merge(diag_vis1, ppmi_merge, on = ['EVENT_ID', 'PATNO'], how = "outer" ) # Merge in first diagnosis change
 ppmi_merge = pd.merge(diag_vis2, ppmi_merge, on = ['EVENT_ID', 'PATNO'], how = "outer" ) # Merge in second diagnosis change
@@ -215,18 +213,18 @@ ppmi_merge['DIAG2'].replace({ 'MSA' : 'Multiple System Atrophy', 'DLB': 'Dimenti
 ppmi_merge.rename(columns = {'DIAG1' : 'First.Diagnosis.Change', 'DIAG2' : 'Second.Diagnosis.Change'}, inplace = True) # Rename columns
 
 ## Dominant side of disease
-ppmi_merge = merge_new_csv(ppmi_merge, 'PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv',['PATNO', 'EVENT_ID', 'DOMSIDE']) # Domside
+ppmi_merge = merge_new_csv(ppmi_merge, 'PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv',['PATNO', 'EVENT_ID', 'DOMSIDE'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # Domside
 ppmi_merge['DOMSIDE'].replace({1 : 'Left', 2 : 'Right', 3 : 'Symmetric'}, inplace = True) # Decode 
 
 ## Participant Motor Function Questionnaire 
-ppmi_merge = merge_new_csv(ppmi_merge, 'Participant_Motor_Function_Questionnaire.csv', ['PATNO','EVENT_ID','PAG_NAME','CMPLBY2','TRBUPCHR','WRTSMLR','VOICSFTR','POORBAL','FTSTUCK','LSSXPRSS','ARMLGSHK','TRBBUTTN','SHUFFLE','MVSLOW','TOLDPD'])
+ppmi_merge = merge_new_csv(ppmi_merge, 'Participant_Motor_Function_Questionnaire.csv', ['PATNO', 'EVENT_ID', 'PAG_NAME', 'CMPLBY2', 'TRBUPCHR', 'WRTSMLR', 'VOICSFTR', 'POORBAL', 'FTSTUCK', 'LSSXPRSS', 'ARMLGSHK', 'TRBBUTTN', 'SHUFFLE', 'MVSLOW', 'TOLDPD'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
 ppmi_merge['CMPLBY2'].replace({1: 'Participant', 2 : 'Caregiver' , 3 : 'Participant and Caregivier'}, inplace = True)
 ppmi_merge['PAG_NAME'].replace({'PQUEST' : 'Participant Motor Function Questionnaire'}, inplace = True) 
-ppmi_merge = decode_0_1_no_yes(ppmi_merge, ['TRBUPCHR','WRTSMLR', 'VOICSFTR', 'POORBAL', 'FTSTUCK', 'LSSXPRSS', 'ARMLGSHK', 'TRBBUTTN', 'SHUFFLE', 'MVSLOW', 'TOLDPD'])
+ppmi_merge = decode_0_1_no_yes(ppmi_merge, ['TRBUPCHR', 'WRTSMLR', 'VOICSFTR', 'POORBAL', 'FTSTUCK', 'LSSXPRSS', 'ARMLGSHK', 'TRBBUTTN', 'SHUFFLE', 'MVSLOW', 'TOLDPD'])
 ppmi_merge = ppmi_merge.rename(columns = {'PAG_NAME' : 'Motor.Function.Page.Name', 'CMPLBY2' : 'Motor.Function.Source', 'TRBUPCHR' : 'Trouble.Rising.Chair', 'WRTSMLR' : 'Writing.Smaller', 'VOICSFTR' : 'Voice.Softer' , 'POORBAL': 'Poor.Balance' , 'FTSTUCK' : 'Feet.Stuck', 'LSSXPRSS' : 'Less.Expressive' , 'ARMLGSHK':'Arms/Legs.Shake', 'TRBBUTTN' : 'Trouble.Buttons' , 'SHUFFLE' : 'Shuffle.Feet' , 'MVSLOW' : 'Slow.Movements' , 'TOLDPD' : 'Been.Told.PD' })
 
 ## Cognitive symptoms - Cognitive Categorization
-ppmi_merge = merge_new_csv(ppmi_merge, 'Cognitive_Categorization.csv',['PATNO' , 'EVENT_ID', 'PAG_NAME', 'COGDECLN', 'FNCDTCOG' , 'COGDXCL' ,'PTCGBOTH' , 'COGSTATE' , 'COGCAT_TEXT']) # Visit date, weight and height 
+ppmi_merge = merge_new_csv(ppmi_merge, 'Cognitive_Categorization.csv',['PATNO' , 'EVENT_ID', 'PAG_NAME', 'COGDECLN', 'FNCDTCOG' , 'COGDXCL' ,'PTCGBOTH' , 'COGSTATE' , 'COGCAT_TEXT'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # Visit date, weight and height 
 ppmi_merge = decode_0_1_no_yes(ppmi_merge, ['COGDECLN', 'FNCDTCOG'])
 ppmi_merge['COGDXCL'].replace({1 : '90 - 100%', 2 : '50 - 89%', 3 : '10 - 49%', 4 : '0 - 9%'}, inplace = True) 
 ppmi_merge['PTCGBOTH'].replace({1 : 'Participant', 2 : 'Caregiver', 3 : 'Participant and Caregiver'}, inplace = True) 
@@ -235,12 +233,12 @@ ppmi_merge = ppmi_merge.rename(columns = {'PAG_NAME' : 'Cognitive.Page.Name', 'C
 ppmi_merge['Cognitive.Page.Name'].replace({'COGCATG' : 'Cognitive Categorization'}, inplace = True) # Rename
 
 ## Cognitive symptoms - MOCA 
-ppmi_merge = merge_new_csv(ppmi_merge, 'Montreal_Cognitive_Assessment__MoCA_.csv',['PATNO','EVENT_ID', 'MCATOT'])
+ppmi_merge = merge_new_csv(ppmi_merge, 'Montreal_Cognitive_Assessment__MoCA_.csv',['PATNO', 'EVENT_ID', 'MCATOT'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
 ppmi_merge.rename(columns = {'MCATOT' : 'MOCA.Total'}, inplace = True) # Rename
 
-## Medication Status - Concomitant Med Log
+## Medication Status - Concomitant Med Log # FIXME not a useful way to show medication status 
 med_df = pd.read_csv(ppmi_download_path + 'Concomitant_Medication_Log.csv', skipinitialspace=True) # Medication history 
-med_df.replace({';' : ','}, regex = True, inplace = True) # Replace ';' with ','
+med_df.replace({';' : ','}, regex = True, inplace = True) # Replace ';' with ',' in med_df
 med_df['CMTRT'] = med_df['CMTRT'].str.title() # Capitalize all medication names 
 med_df['STARTDT'].fillna('NA', inplace = True) # Fillna
 med_df['STOPDT'].fillna('NA', inplace = True) # Fillna
@@ -252,81 +250,83 @@ med_df = med_df.groupby(['PATNO','EVENT_ID'])['Medication'].apply('; '.join)
 ppmi_merge = pd.merge(ppmi_merge, med_df, on = ['PATNO', 'EVENT_ID'], how = "outer") # Merge med_df in 
 ppmi_merge = ppmi_merge.sort_values(by = ['PATNO','Age']).reset_index(drop = True) # Sort values by subject and age (similar to event id bc age in order of event id)
 
-## LEDD Medication Status - without ongoing stop dates
-LEDD_med_df = pd.read_csv(ppmi_download_path + 'LEDD_Concomitant_Medication_Log.csv', skipinitialspace=True) # Medication history 
-LEDD_med_df = LEDD_med_df[['PATNO', 'LEDD', 'STARTDT', 'STOPDT']]
+## LEDD Medication Status - FIXME Assumtion : If stop date is NA we assume LEDD only occurred in that month 
+LEDD_med_df = pd.read_csv(ppmi_download_path + 'LEDD_Concomitant_Medication_Log.csv', skipinitialspace = True) # LEDD Medication history 
+LEDD_med_df = LEDD_med_df[['PATNO', 'LEDD', 'STARTDT', 'STOPDT']] # Keep only 
 ppmi_merge['INFODT'] = pd.to_datetime(ppmi_merge['INFODT'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
-LEDD_med_df['STARTDT'] = pd.to_datetime(LEDD_med_df['STARTDT'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
-LEDD_med_df['STOPDT'] = pd.to_datetime(LEDD_med_df['STOPDT'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
+LEDD_med_df['STARTDT'] = pd.to_datetime(LEDD_med_df['STARTDT'], format = '%m%Y', errors = 'ignore') # change to STARTDT to type datetime so we can sort according to date 
+LEDD_med_df['STOPDT'] = pd.to_datetime(LEDD_med_df['STOPDT'], format = '%m%Y', errors = 'ignore') # change to STOPDT to type datetime so we can sort according to date 
 LEDD_med_df['STOPDT2'] = LEDD_med_df['STOPDT'] # Initialize second stop date variable
-LEDD_med_df['STOPDT2'].fillna(LEDD_med_df['STARTDT'], inplace = True)# Fill in NaN stop dates with start dates 
+LEDD_med_df['STOPDT2'].fillna(LEDD_med_df['STARTDT'], inplace = True) # Fill in NaN stop dates with start dates # ASSUMPTION START and STOP on same month 
 LEDD_med_df = LEDD_med_df.merge(LEDD_med_df.apply(lambda s: pd.date_range(s.STARTDT, s.STOPDT2, freq='MS', inclusive = 'both'), 1).explode().rename('INFODT').dt.strftime('%m/%Y'), left_index=True, right_index=True) # Create a row for every month/year for LEDD 
-LEDD_med_df.drop(['STOPDT2'], axis = 1, inplace = True)
+LEDD_med_df.drop(['STOPDT2'], axis = 1, inplace = True) # Drop
 LEDD_med_df.rename(columns = {'STARTDT' : 'LEDD.STARTDT', 'STOPDT': 'LEDD.STOPDT'}, inplace = True) # Rename 
 
-# If one event id has > 1 LEDD - take max LEDD only 
+# If one event id has more than 1 LEDD entry - take max LEDD only FIXME
 ppmi_merge_temp = ppmi_merge[['PATNO', 'EVENT_ID', 'INFODT']]
 ppmi_merge_temp = pd.merge(ppmi_merge_temp, LEDD_med_df, on = ['PATNO', 'INFODT'], how = "left")
 ppmi_merge_temp = ppmi_merge_temp[['PATNO', 'EVENT_ID', 'LEDD', 'LEDD.STARTDT', 'LEDD.STOPDT']] # keep only 
 ppmi_merge_temp = ppmi_merge_temp[ppmi_merge_temp["LEDD"].str.contains("LD") == False] # FIXME not sure what to do with LD x .33 etc rows - for now remove 
-uids = ppmi_merge_temp['PATNO'].unique() # Unique subject ids
-myevs = ppmi_merge_temp['EVENT_ID'].unique() # Unique event ids
-ppmi_merge_temp['LEDD2'] = False
-for myev in myevs : 
-    for u in uids :
-        selu = ppmi_merge_temp.loc[(ppmi_merge_temp['PATNO'] == u) & (ppmi_merge_temp['EVENT_ID'] == myev) & (ppmi_merge_temp['LEDD'].notna())]
-        if len(selu) == 1: 
-            idx = selu.index
-            ppmi_merge_temp.loc[idx, 'LEDD2'] = True
-        if len(selu) > 1 : 
-            selu['LEDD'] = selu['LEDD'].astype(float)
-            maxidx = selu.LEDD.idxmax()
-            ppmi_merge_temp.loc[maxidx, 'LEDD2'] = True
+
+# Create a column with True/False for LEDD rows we want to keep (max) or only LEDD for that date 
+subids = ppmi_merge_temp['PATNO'].unique() # Unique subject ids
+eventids = ppmi_merge_temp['EVENT_ID'].unique() # Unique event ids
+ppmi_merge_temp['LEDD_keep'] = False
+for eventid in eventids : 
+    for subid in subids :
+        df = ppmi_merge_temp.loc[(ppmi_merge_temp['PATNO'] == subid) & (ppmi_merge_temp['EVENT_ID'] == eventid) & (ppmi_merge_temp['LEDD'].notna())]
+        if len(df) == 1: 
+            idx = df.index
+            ppmi_merge_temp.loc[idx, 'LEDD_keep'] = True
+        if len(df) > 1 : 
+            df['LEDD'] = df['LEDD'].astype(float)
+            maxidx = df.LEDD.idxmax()
+            ppmi_merge_temp.loc[maxidx, 'LEDD_keep'] = True
         
-ledd_keep = ppmi_merge_temp['LEDD2'] == True
-LEDD_new_df = ppmi_merge_temp[ledd_keep]
-LEDD_new_df.drop(['LEDD2'], axis = 1, inplace = True)
+LEDD_new_df = ppmi_merge_temp[ppmi_merge_temp['LEDD_keep'] == True]
+LEDD_new_df.drop(['LEDD_keep'], axis = 1, inplace = True)
 ppmi_merge = pd.merge(ppmi_merge, LEDD_new_df, on = ['PATNO','EVENT_ID'], how = "left") # Merge into ppmi_merge
 
-## LEDD with ongoing stop dates
-LEDD_med_df = pd.read_csv(ppmi_download_path + 'LEDD_Concomitant_Medication_Log.csv', skipinitialspace=True) # Medication history 
+## LEDD Medication Status - FIXME Assumption : If stop date is NA we assume therapy is ongoing 
+LEDD_med_df = pd.read_csv(ppmi_download_path + 'LEDD_Concomitant_Medication_Log.csv', skipinitialspace = True) # LEDD medication history 
 LEDD_med_df = LEDD_med_df[['PATNO', 'LEDD', 'STARTDT', 'STOPDT']]
-ppmi_merge['INFODT'] = pd.to_datetime(ppmi_merge['INFODT'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
-LEDD_med_df['STARTDT'] = pd.to_datetime(LEDD_med_df['STARTDT'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
-LEDD_med_df['STOPDT'] = pd.to_datetime(LEDD_med_df['STOPDT'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
+ppmi_merge['INFODT'] = pd.to_datetime(ppmi_merge['INFODT'], format = '%m%Y', errors = 'ignore') # Change to INFODT to type datetime so we can sort according to date 
+LEDD_med_df['STARTDT'] = pd.to_datetime(LEDD_med_df['STARTDT'], format = '%m%Y', errors = 'ignore') # Change to INFODT to type datetime so we can sort according to date 
+LEDD_med_df['STOPDT'] = pd.to_datetime(LEDD_med_df['STOPDT'], format = '%m%Y', errors = 'ignore') # Change to INFODT to type datetime so we can sort according to date 
 LEDD_med_df['STOPDT3'] = LEDD_med_df['STOPDT']
 LEDD_med_df['STOPDT3'].fillna('01/2022', inplace = True) # Fill in ongoing stopdate (12/2021 is max infodt in ppmi_merge file)
 LEDD_med_df['STOPDT3'] = pd.to_datetime(LEDD_med_df['STOPDT3'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
 LEDD_med_df = LEDD_med_df.merge(LEDD_med_df.apply(lambda s: pd.date_range(s.STARTDT, s.STOPDT3, freq='MS', inclusive = 'both'), 1).explode().rename('INFODT').dt.strftime('%m/%Y'), left_index=True, right_index=True) # Create a row for every month/year for LEDD 
 LEDD_med_df.rename(columns = {'LEDD' : 'LEDD.ongoing', 'STARTDT' : 'LEDD.STARTDT.ongoing', 'STOPDT3': 'LEDD.STOPDT.ongoing'}, inplace = True) # Rename 
 
-# If one event id has > 1 LEDD - take max LEDD only 
+# If one event id has more than 1 LEDD entry - take max LEDD only FIXME
 ppmi_merge_temp = ppmi_merge[['PATNO', 'EVENT_ID', 'INFODT']]
 ppmi_merge_temp = pd.merge(ppmi_merge_temp, LEDD_med_df, on = ['PATNO', 'INFODT'], how = "left")
 ppmi_merge_temp = ppmi_merge_temp[['PATNO', 'EVENT_ID', 'LEDD.ongoing', 'LEDD.STARTDT.ongoing', 'LEDD.STOPDT.ongoing']] # keep only 
 ppmi_merge_temp = ppmi_merge_temp[ppmi_merge_temp["LEDD.ongoing"].str.contains("LD") == False] # FIXME not sure what to do with LD x .33 etc rows - for now remove 
-uids = ppmi_merge_temp['PATNO'].unique() # Unique subject ids
-myevs = ppmi_merge_temp['EVENT_ID'].unique() # Unique event ids
-ppmi_merge_temp['LEDD2.ongoing'] = False
-for myev in myevs : 
-    for u in uids :
-        selu = ppmi_merge_temp.loc[(ppmi_merge_temp['PATNO'] == u) & (ppmi_merge_temp['EVENT_ID'] == myev) & (ppmi_merge_temp['LEDD.ongoing'].notna())]
-        if len(selu) == 1: 
-            idx = selu.index
-            ppmi_merge_temp.loc[idx, 'LEDD2.ongoing'] = True
-        if len(selu) > 1 : 
-            selu['LEDD.ongoing'] = selu['LEDD.ongoing'].astype(float)
-            maxidx = selu['LEDD.ongoing'].idxmax()
-            ppmi_merge_temp.loc[maxidx, 'LEDD2.ongoing'] = True
+
+# Create a column with True/False for LEDD rows we want to keep (max) or only LEDD for that date 
+subids = ppmi_merge_temp['PATNO'].unique() # Unique subject ids
+eventids = ppmi_merge_temp['EVENT_ID'].unique() # Unique event ids
+ppmi_merge_temp['LEDD_keep.ongoing'] = False
+for eventid in eventids : 
+    for subid in subids :
+        df = ppmi_merge_temp.loc[(ppmi_merge_temp['PATNO'] == subid) & (ppmi_merge_temp['EVENT_ID'] == eventid) & (ppmi_merge_temp['LEDD.ongoing'].notna())]
+        if len(df) == 1: 
+            idx = df.index
+            ppmi_merge_temp.loc[idx, 'LEDD_keep.ongoing'] = True
+        if len(df) > 1 : 
+            df['LEDD.ongoing'] = df['LEDD.ongoing'].astype(float)
+            maxidx = df['LEDD.ongoing'].idxmax()
+            ppmi_merge_temp.loc[maxidx, 'LEDD_keep.ongoing'] = True
         
-ledd_keep = ppmi_merge_temp['LEDD2.ongoing'] == True
-LEDD_new_df = ppmi_merge_temp[ledd_keep]
-LEDD_new_df.drop(['LEDD2.ongoing'], axis = 1, inplace = True)
+LEDD_new_df = ppmi_merge_temp[ppmi_merge_temp['LEDD_keep.ongoing'] == True] # Keep only portion of df where LEDD_keep.ongoing == True (max or only LEDD entry)
+LEDD_new_df.drop(['LEDD_keep.ongoing'], axis = 1, inplace = True)
 ppmi_merge = pd.merge(ppmi_merge, LEDD_new_df, on = ['PATNO','EVENT_ID'], how = "left") # Merge into ppmi_merge
 ppmi_merge['LEDD.STOPDT.ongoing'].replace({'01/2022'  : np.NaN}, inplace = True) # Replace filler stop date for ledd ongoing back to nan
 
 
-## Comorbidities
+## Comorbidities # FIXME not useful column 
 comorbid_df = pd.read_csv(ppmi_download_path + 'Medical_Conditions_Log.csv', skipinitialspace=True) # Medication history 
 comorbid_df.replace({';' : ','}, regex = True, inplace = True) # Replace ';' with ','
 comorbid_df = comorbid_df[['PATNO', 'EVENT_ID', 'MHDIAGDT','MHTERM']] # keep only 
@@ -338,14 +338,14 @@ comorbid_df = merge_columns(comorbid_df, ['MHTERM', 'MHDIAGDT'], 'Medical.Histor
 comorbid_df = comorbid_df.groupby(['PATNO','EVENT_ID'])['Medical.History.Description(Diagnosis.Date)'].apply('; '.join)
 ppmi_merge = pd.merge(ppmi_merge, comorbid_df, on = ['PATNO','EVENT_ID'], how = "outer")
 
-## Education (in years)- FIXME make integer
+## Education (in years)
 education_df = pd.read_csv(ppmi_download_path + 'Socio-Economics.csv', skipinitialspace = True) # Education info 
 education_df = education_df[['PATNO', 'EVENT_ID', 'EDUCYRS']] # Keep info 
 education_df.rename(columns = {'EDUCYRS' : 'Education.Years'}, inplace = True) # Rename 
 education_df = education_df.groupby('PATNO').mean().reset_index() # Take the mean of education years if there are 2 different number of years for one subject
 ppmi_merge = pd.merge(ppmi_merge, education_df, on = ['PATNO'], how = "outer") # Merge
 
-## Add in analytic cohort column 
+## Add in 'Analytic.Cohort' column 
 analytic_cohort = ppmi_merge['PATNO'].isin(analytic_cohort_subids)
 ppmi_merge['Analytic.Cohort'] = '' # Initialize Analytic.Cohort col
 ppmi_merge['Analytic.Cohort'].loc[analytic_cohort] = 'Analytic Cohort'
@@ -355,17 +355,17 @@ ppmi_merge['Analytic.Cohort'].fillna('Not Analytic Cohort', inplace = True)
 ppmi_merge = ppmi_merge.reindex(columns = ['PATNO', 'EVENT_ID', 'INFODT' , 'Enroll.Diagnosis', 'Enroll.Subtype', 'Consensus.Diagnosis', 'Consensus.Subtype','Analytic.Cohort','Subject.Phenoconverted','First.Diagnosis.Change', 'Second.Diagnosis.Change',  'First.Symptom.Date', 'PD.Diagnosis.Date', 'PD.Diagnosis.Duration','BirthDate', 'Age', 'Sex', 'Handed', 'Weight(kg)',	'Height(cm)', 'Education.Years', 'DOMSIDE', 'African.Berber.Race','Ashkenazi.Jewish.Race', 'Basque.Race', 'Hispanic.Latino.Race', 'Asian.Race', 'African.American.Race', 'Hawian.Other.Pacific.Islander.Race', 'Indian.Alaska.Native.Race', 'Not.Specified.Race',  'White.Race', 'Motor.Function.Page.Name',	'Motor.Function.Source',	'Trouble.Rising.Chair',	'Writing.Smaller',	'Voice.Softer',	'Poor.Balance',	'Feet.Stuck',	'Less.Expressive',	'Arms/Legs.Shake',	'Trouble.Buttons',	'Shuffle.Feet',	'Slow.Movements',	'Been.Told.PD',	'Cognitive.Page.Name',	'Cognitive.Source', 'Cognitive.Decline',	'Functional.Cognitive.Impairment',	'Confidence.Level.Cognitive.Diagnosis',	'Cognitive.State',	'Cognitive.Tscore.Cat',	'MOCA.Total', 'Medication' , 'LEDD' , 'LEDD.STARTDT' , 'LEDD.STOPDT', 'LEDD.ongoing', 'LEDD.STARTDT.ongoing', 'LEDD.STOPDT.ongoing','Medical.History.Description(Diagnosis.Date)'])
 
 ## Add in other csvs
-ppmi_merge = merge_new_csv(ppmi_merge, 'Modified_Boston_Naming_Test.csv', ['PATNO', 'EVENT_ID', 'MBSTNSCR', 'MBSTNCRC', 'MBSTNCRR', 'MBSTNVRS'])
-ppmi_merge = merge_new_csv(ppmi_merge, 'Clock_Drawing.csv', ['PATNO', 'EVENT_ID', 'CLCKTOT'])
-ppmi_merge = merge_new_csv(ppmi_merge, 'Benton_Judgement_of_Line_Orientation.csv', ['PATNO', 'EVENT_ID', 'JLO_TOTCALC'])
-ppmi_merge = merge_new_csv(ppmi_merge, 'Letter_-_Number_Sequencing.csv', ['PATNO', 'EVENT_ID', 'LNS_TOTRAW'])
-ppmi_merge = merge_new_csv(ppmi_merge, 'Modified_Semantic_Fluency.csv', ['PATNO', 'EVENT_ID', 'DVS_SFTANIM'])
-ppmi_merge = merge_new_csv(ppmi_merge, 'Hopkins_Verbal_Learning_Test_-_Revised.csv',['PATNO', 'EVENT_ID', 'DVT_DELAYED_RECALL', 'DVT_TOTAL_RECALL'])
-ppmi_merge = merge_new_csv(ppmi_merge, 'Symbol_Digit_Modalities_Test.csv', ['PATNO', 'EVENT_ID', 'SDMTOTAL'])
+ppmi_merge = merge_new_csv(ppmi_merge, 'Modified_Boston_Naming_Test.csv', ['PATNO', 'EVENT_ID', 'MBSTNSCR', 'MBSTNCRC', 'MBSTNCRR', 'MBSTNVRS'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
+ppmi_merge = merge_new_csv(ppmi_merge, 'Clock_Drawing.csv', ['PATNO', 'EVENT_ID', 'CLCKTOT'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
+ppmi_merge = merge_new_csv(ppmi_merge, 'Benton_Judgement_of_Line_Orientation.csv', ['PATNO', 'EVENT_ID', 'JLO_TOTCALC'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
+ppmi_merge = merge_new_csv(ppmi_merge, 'Letter_-_Number_Sequencing.csv', ['PATNO', 'EVENT_ID', 'LNS_TOTRAW'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
+ppmi_merge = merge_new_csv(ppmi_merge, 'Modified_Semantic_Fluency.csv', ['PATNO', 'EVENT_ID', 'DVS_SFTANIM'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
+ppmi_merge = merge_new_csv(ppmi_merge, 'Hopkins_Verbal_Learning_Test_-_Revised.csv',['PATNO', 'EVENT_ID', 'DVT_DELAYED_RECALL', 'DVT_TOTAL_RECALL'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
+ppmi_merge = merge_new_csv(ppmi_merge, 'Symbol_Digit_Modalities_Test.csv', ['PATNO', 'EVENT_ID', 'SDMTOTAL'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
 ppmi_merge.rename(columns = {'CLCKTOT' : 'Clock.Drawing.Total', 'JLOTOTCALC' : 'JOLO.Total', 'LNS_TOTRAW' : 'Letter.Number.Sequencing.Total','DVS_SFTANIM' : 'Semantic.Fluency.Total','DVT_TOTAL_RECALL' : 'DVT.Total.RECALL','SDMTOTAL' : 'Symbol.Digit.Modalities.Total'}, inplace = True)
 
 ## REM Sleeep behavior disorder questionnaire
-ppmi_merge = merge_new_csv(ppmi_merge, 'REM_Sleep_Behavior_Disorder_Questionnaire.csv', ['PATNO',	'EVENT_ID',	'PAG_NAME',	'PTCGBOTH',	'DRMVIVID',	'DRMAGRAC',	'DRMNOCTB',	'SLPLMBMV',	'SLPINJUR',	'DRMVERBL',	'DRMFIGHT',	'DRMUMV',	'DRMOBJFL',	'MVAWAKEN',	'DRMREMEM',	'SLPDSTRB',	'STROKE',	'HETRA',	'PARKISM',	'RLS',	'NARCLPSY',	'DEPRS',	'EPILEPSY',	'BRNINFM',	'CNSOTH'])
+ppmi_merge = merge_new_csv(ppmi_merge, 'REM_Sleep_Behavior_Disorder_Questionnaire.csv', ['PATNO', 'EVENT_ID', 'PAG_NAME', 'PTCGBOTH', 'DRMVIVID', 'DRMAGRAC', 'DRMNOCTB', 'SLPLMBMV', 'SLPINJUR', 'DRMVERBL', 'DRMFIGHT', 'DRMUMV', 'DRMOBJFL', 'MVAWAKEN',	'DRMREMEM',	'SLPDSTRB',	'STROKE', 'HETRA', 'PARKISM', 'RLS', 'NARCLPSY', 'DEPRS', 'EPILEPSY', 'BRNINFM', 'CNSOTH'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
 ppmi_merge.rename(columns = {'PAG_NAME' : 'REM.Sleep.Behavior.Disorder.Page.Name'}, inplace = True) 
 ppmi_merge['REM.Sleep.Behavior.Disorder.Page.Name'].replace({'REMSLEEP' : 'REM Sleep Behavior Disorder Questionnaire'}, inplace = True) 
 ppmi_merge['PTCGBOTH'].replace({1 : 'Participant', 2 : 'Caregiver', 3: 'Participant and Caregiver'}, inplace = True)
@@ -377,15 +377,15 @@ ppmi_merge.rename(columns = {'PTCGBOTH' : 'Sleep.Behavior.Source.REM','DRMVIVID'
 
 #### IMAGING INFO ####
 # FIXME - laterality issue?  SUV ?
-ppmi_merge = merge_new_csv(ppmi_merge,'DaTScan_Analysis.csv', ['PATNO','EVENT_ID','DATSCAN_DATE','DATSCAN_CAUDATE_R','DATSCAN_CAUDATE_L','DATSCAN_PUTAMEN_R','DATSCAN_PUTAMEN_L','DATSCAN_ANALYZED','DATSCAN_NOT_ANALYZED_REASON'])
-ppmi_merge = merge_new_csv(ppmi_merge,'DaTScan_Imaging.csv', ['PATNO','EVENT_ID','PAG_NAME','INFODT','DATSCAN','PREVDATDT','SCNLOC','SCNINJCT','VSINTRPT','VSRPTELG'])
+ppmi_merge = merge_new_csv(ppmi_merge,'DaTScan_Analysis.csv', ['PATNO','EVENT_ID','DATSCAN_DATE','DATSCAN_CAUDATE_R','DATSCAN_CAUDATE_L','DATSCAN_PUTAMEN_R','DATSCAN_PUTAMEN_L','DATSCAN_ANALYZED','DATSCAN_NOT_ANALYZED_REASON'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
+ppmi_merge = merge_new_csv(ppmi_merge,'DaTScan_Imaging.csv', ['PATNO','EVENT_ID','PAG_NAME','INFODT','DATSCAN','PREVDATDT','SCNLOC','SCNINJCT','VSINTRPT','VSRPTELG'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
 ppmi_merge['DATSCAN'].replace({0 : 'Not Completed', 1: 'Completed', 2 : 'Completed using a previously acquired DaTscan (i.e., acquired prior to participant\'s consent to PPMI)' }, inplace = True)
 ppmi_merge['SCNLOC'].replace({ 1 : 'Site', 2 : 'IND'}, inplace = True )
 ppmi_merge['SCNINJCT'].replace({ 1 : 'DaTSCAN', 2 : 'Beta-CIT'}, inplace = True)
 ppmi_merge['VSINTRPT'].replace({ '1' : 'Consistent with evidence' , '2' : 'Not consistent with evidence', '3' : 'No visual interpretation report provided'}, inplace = True)
 ppmi_merge['VSRPTELG'].replace({1 : 'Eligible', 2 : 'Not eligible'}, inplace = True)
 ppmi_merge.rename(columns = {'INFODT_x' : 'INFODT', 'INFODT_y' : 'DaTScan.INFODT', 'SCNLOC' : 'Location.Scan.Completed' , 'PREVDATDT' : 'Date.DaTscan.Imaging.Completed.Previously', 'SCNINJCT' : 'Scan.Injection', 'VSINTRPT' : 'Visual.Interpretation.Report', 'VSRPTELG' : 'Visual.Interpretation.Report(eligible/not)'}, inplace = True)
-ppmi_merge['INFODT'].fillna(ppmi_merge['DaTScan.INFODT'], inplace = True)# Fill in NaN infodts with datscan infodts if na  
+ppmi_merge['INFODT'].fillna(ppmi_merge['DaTScan.INFODT'], inplace = True) # Fill in NaN infodts with datscan infodts if NA
 
 # FIXME - After merging in datscan files, duplicate event ids being created one with DATSCAN as "Completed" one with DATSCAN as "not completed" - if there are both of these - keep only "Completed"
 duplicate_datscan = ppmi_merge[['PATNO','EVENT_ID']].duplicated(keep = False) # Find locations of True for duplicated subs w/ 2 MRI at baseline
@@ -404,8 +404,7 @@ mri_df = decode_0_1_no_yes(mri_df, ['MRIWDTI','MRIWRSS','MRIRSSDF'])
 mri_df['MRIRSLT'].replace({1 : 'Normal', 2 : 'Abnormal, not clinically significant', 3 : 'Abnormal, clinically significant'}, inplace = True) # Decode
 mri_df.rename(columns = { 'INFODT' : 'Image.Acquisition.Date', 'MRICMPLT' : 'MRI.Completed', 'MRIWDTI' : 'MRI.DTI' , 'MRIWRSS' : 'MRI.Resting.State' , 'MRIRSLT' : 'MRI.Results' , 'MRIRSSDF' : 'Resting.State.Dif.Day.PDMed.Use'}, inplace = True) # Rename
 
-## FIXME - do we want to get rid of these?
-# Some subjects had two baseline rows - 1 with incomplete MRI.Completed and 1 with complete as MRI.Complete - I am only keeping the one that is complete bc the data we have on s3 is complete
+# FIXME Some subjects had two baseline rows - 1 with incomplete MRI.Completed and 1 with complete as MRI.Complete - I am only keeping the one that is complete bc the data we have on s3 is complete
 duplicate_mri = mri_df[['PATNO','EVENT_ID']].duplicated(keep = False) # Find locations of True for duplicated subs w/ 2 MRI at baseline
 duplicate_mri_index = mri_df[duplicate_mri == True].index.tolist() # Get index of duplicates 
 dup_subid_list = [] # Initialize duplicate subid list variable
@@ -450,8 +449,8 @@ for current_subid_date_temp in matches :
             image_id_split = image_id.split('/')
             s3_df = s3_df.append({'PATNO' : image_id_split[0], 'EVENT_ID' : ppmi_merge.loc[ppmi_merge['Subid.Date.TEMP']==current_subid_date_temp,'EVENT_ID'].iloc[0], 'T1.s3.Image.Name' : image_id_split[-1]}, ignore_index = True)
 
-# Create a column in s3_df for just object name so later we can merge Taylor's T1 file with object name
-s3_df['PATNO'] = s3_df['PATNO'].astype(int) # needed for merge on PATNO
+# Create a column in s3_df for just object name so later we can merge T1 file with object name
+s3_df['PATNO'] = s3_df['PATNO'].astype(int) # Needed for merge on PATNO
 s3_df['Image_ID_merge'] = '' 
 for row_num in range(len(s3_df['T1.s3.Image.Name'])) : 
     image0 = s3_df['T1.s3.Image.Name'].iloc[row_num].split('.')[0] # Get name of image before .nii.gz
@@ -1020,13 +1019,13 @@ ppmi_merge.loc[ppmi_merge['DXs2'] == 'nonPDorMSA', 'PD.Min.Disease.Duration'] = 
 # For PD subjects, fill in PD.Min.Disease.Duration
 ppmi_merge['PD.Diagnosis.Duration'].fillna('', inplace = True)
 
-uids = ppmi_merge['Subject.ID'].unique() # Unique subject ids
-for u in uids : 
-    ww = ppmi_merge[(ppmi_merge['Subject.ID'] == u) & (ppmi_merge['DXs2'] == 'PD') & (ppmi_merge['PD.Diagnosis.Duration'] != '')]
-    if len(ww) > 0 : 
-        print(ww['PD.Diagnosis.Duration'])
-        mydd = min(ww['PD.Diagnosis.Duration'])
-        ppmi_merge.loc[ppmi_merge['Subject.ID'] == u, 'PD.Min.Disease.Duration'] = mydd
+subids = ppmi_merge['Subject.ID'].unique() # Unique subject ids
+for subid in subids : 
+    df = ppmi_merge[(ppmi_merge['Subject.ID'] == subid) & (ppmi_merge['DXs2'] == 'PD') & (ppmi_merge['PD.Diagnosis.Duration'] != '')]
+    if len(df) > 0 : 
+        print(df['PD.Diagnosis.Duration'])
+        mydd = min(df['PD.Diagnosis.Duration'])
+        ppmi_merge.loc[ppmi_merge['Subject.ID'] == subid, 'PD.Min.Disease.Duration'] = mydd
 
 ## Add in Visit column 
 ppmi_merge['Visit'] = np.NaN # Initialize Visit col
@@ -1043,5 +1042,5 @@ ppmi_merge['Visit'] = ppmi_merge['Visit'].replace(9999, np.nan)  # Replace 9999 
 # Final re-organization of ppmi_merge and save 
 ppmi_merge.set_index('Subject.ID', inplace = True)
 ppmi_merge.fillna('NA', inplace = True)
-ppmi_merge.to_csv(userdir + 'ppmi_merge_v0.csv')
+ppmi_merge.to_csv(userdir + 'ppmi_merge_v' + version + '.csv')
 ```
