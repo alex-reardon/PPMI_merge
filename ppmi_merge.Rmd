@@ -36,9 +36,6 @@ invicro_data_path = userdir
 genetics_path = userdir + 'genetic_data/'
 version = '0.1' # File version to save as i.e. ppmi_merge_v0.1.csv
 
-#### CLINICAL INFO ####
-xlsx = pd.ExcelFile(ppmi_download_path + 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx') # Read in main xlsx file 
-
 def create_cohort_df(xlsx, sheet) : 
     cohort_df = pd.read_excel(xlsx, sheet)
     cols_delete = ['Unnamed', 'CONDATE'] # Columns to remove from sheet/df
@@ -96,7 +93,10 @@ def condensed_df(df, keep_col_list, rename_col_dict, drop_col_list) :
     new_df.dropna(subset = drop_col_list, inplace = True)
     return new_df
 
+
+#### CLINICAL INFO ####
 # Create cohort df 
+xlsx = pd.ExcelFile(ppmi_download_path + 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx') # Read in main xlsx file 
 pd_df = create_cohort_df(xlsx, 'PD') # Create Parkinson's Disease data frame from 'PD' sheet in 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
 prodromal_df = create_cohort_df(xlsx, 'Prodromal')# Create Prodromal data frame from 'PD' sheet in 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
 hc_df = create_cohort_df(xlsx, 'HC')# Create HC data frame from 'PD' sheet in 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
