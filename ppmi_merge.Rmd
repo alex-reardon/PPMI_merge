@@ -58,7 +58,7 @@ def merge_columns(df : pd.DataFrame , old_df_columns : list, new_df_column_name 
     empty/nan column entries.  
     """
     df = df.replace(r'^\s*$', np.NaN, regex=True) # Fill in empty cells with nan
-    df[new_df_column_name] = df[old_df_columns].agg(lambda x: x.dropna().str.cat(sep = separator), axis = 1) # Combine columns
+    df[new_df_column_name] = df[old_df_columns].agg(lambda x: x.dropna().str.cat(sep= separator), axis=1) # Combine columns
     df.drop(old_df_columns, axis = 1, inplace = True)
     return df 
 
@@ -92,7 +92,6 @@ def condensed_df(df, keep_col_list, rename_col_dict, drop_col_list) :
     new_df.rename(columns = rename_col_dict, inplace = True)
     new_df.dropna(subset = drop_col_list, inplace = True)
     return new_df
-
 
 #### CLINICAL INFO ####
 # Create cohort df 
@@ -250,6 +249,7 @@ med_df = med_df.groupby(['PATNO','EVENT_ID'])['Medication'].apply('; '.join)
 ppmi_merge = pd.merge(ppmi_merge, med_df, on = ['PATNO', 'EVENT_ID'], how = "outer") # Merge med_df in 
 ppmi_merge = ppmi_merge.sort_values(by = ['PATNO','Age']).reset_index(drop = True) # Sort values by subject and age (similar to event id bc age in order of event id)
 
+
 ## LEDD Medication Status - FIXME Assumtion : If stop date is NA we assume LEDD only occurred in that month 
 LEDD_med_df = pd.read_csv(ppmi_download_path + 'LEDD_Concomitant_Medication_Log.csv', skipinitialspace = True) # LEDD Medication history 
 LEDD_med_df = LEDD_med_df[['PATNO', 'LEDD', 'STARTDT', 'STOPDT']] # Keep only 
@@ -262,68 +262,148 @@ LEDD_med_df = LEDD_med_df.merge(LEDD_med_df.apply(lambda s: pd.date_range(s.STAR
 LEDD_med_df.drop(['STOPDT2'], axis = 1, inplace = True) # Drop
 LEDD_med_df.rename(columns = {'STARTDT' : 'LEDD.STARTDT', 'STOPDT': 'LEDD.STOPDT'}, inplace = True) # Rename 
 
-# If one event id has more than 1 LEDD entry - take max LEDD only FIXME
+# Get a new df with LEDD dates merged onto corect event ids through infodts 
 ppmi_merge_temp = ppmi_merge[['PATNO', 'EVENT_ID', 'INFODT']]
 ppmi_merge_temp = pd.merge(ppmi_merge_temp, LEDD_med_df, on = ['PATNO', 'INFODT'], how = "left")
 ppmi_merge_temp = ppmi_merge_temp[['PATNO', 'EVENT_ID', 'LEDD', 'LEDD.STARTDT', 'LEDD.STOPDT']] # keep only 
-ppmi_merge_temp = ppmi_merge_temp[ppmi_merge_temp["LEDD"].str.contains("LD") == False] # FIXME not sure what to do with LD x .33 etc rows - for now remove 
 
-# Create a column with True/False for LEDD rows we want to keep (max) or only LEDD for that date 
-subids = ppmi_merge_temp['PATNO'].unique() # Unique subject ids
-eventids = ppmi_merge_temp['EVENT_ID'].unique() # Unique event ids
-ppmi_merge_temp['LEDD_keep'] = False
-for eventid in eventids : 
-    for subid in subids :
-        df = ppmi_merge_temp.loc[(ppmi_merge_temp['PATNO'] == subid) & (ppmi_merge_temp['EVENT_ID'] == eventid) & (ppmi_merge_temp['LEDD'].notna())]
-        if len(df) == 1: 
-            idx = df.index
-            ppmi_merge_temp.loc[idx, 'LEDD_keep'] = True
-        if len(df) > 1 : 
-            df['LEDD'] = df['LEDD'].astype(float)
-            maxidx = df.LEDD.idxmax()
-            ppmi_merge_temp.loc[maxidx, 'LEDD_keep'] = True
-        
-LEDD_new_df = ppmi_merge_temp[ppmi_merge_temp['LEDD_keep'] == True]
-LEDD_new_df.drop(['LEDD_keep'], axis = 1, inplace = True)
-ppmi_merge = pd.merge(ppmi_merge, LEDD_new_df, on = ['PATNO','EVENT_ID'], how = "left") # Merge into ppmi_merge
+# Df with LD formulas as variables 
+LD_only = ppmi_merge_temp[ppmi_merge_temp["LEDD"].str.contains("LD") == True] # Get df with only columns that contain LD formula (i.e. LD x0.33)
+LD_only['STOPDT2'] = LD_only['LEDD.STOPDT'] # Initialize second stop date variable
+LD_only['STOPDT2'].fillna(LD_only['LEDD.STARTDT'], inplace = True) # Fill in NaN stop dates with start dates # ASSUMPTION START and STOP on same month 
+LD_only = LD_only.merge(LD_only.apply(lambda s: pd.date_range(s['LEDD.STARTDT'], s.STOPDT2, freq='MS', inclusive = 'both'), 1).explode().rename('INFODT').dt.strftime('%m/%Y'), left_index=True, right_index=True) # Create a row for every month/year for LEDD 
+LD_only.drop(['STOPDT2','EVENT_ID','LEDD.STARTDT','LEDD.STOPDT'], axis = 1, inplace = True) # Drop
+ppmi_merge_LD_only = ppmi_merge[['PATNO', 'EVENT_ID', 'INFODT']]
+ppmi_merge_LD_only = pd.merge(ppmi_merge_LD_only, LD_only, on = ['PATNO', 'INFODT'], how = "left")
+ppmi_merge_LD_only = ppmi_merge_LD_only[['PATNO', 'EVENT_ID', 'LEDD']] # keep only 
+ppmi_merge_LD_only.rename(columns = {'LEDD' : 'LD'}, inplace = True)
+
+# Df without LD formula var - only numeric LEDD vars 
+ppmi_merge_temp = ppmi_merge_temp[ppmi_merge_temp["LEDD"].str.contains("LD") == False] # Remove LD x .33 etc rows from this df 
+ppmi_merge_temp = ppmi_merge_temp.astype({'LEDD' : 'float'})
+LEDD_max = ppmi_merge_temp.loc[ppmi_merge_temp.groupby(['PATNO', 'EVENT_ID'])['LEDD'].idxmax()].reset_index(drop=True) # Get max 
+LEDD_max.rename(columns = {'LEDD' : 'LEDD.max'}, inplace = True) # Rename 
+ppmi_merge = pd.merge(ppmi_merge, LEDD_max, on = ['PATNO','EVENT_ID'], how = "left") # Merge into ppmi_merge
+LEDD_sum = ppmi_merge_temp.groupby(['PATNO', 'EVENT_ID'])['LEDD'].sum().reset_index() # Get sum 
+LEDD_sum.rename(columns = {'LEDD' : 'LEDD.sum'}, inplace = True) # Rename 
+ppmi_merge = pd.merge(ppmi_merge, LEDD_sum, on = ['PATNO','EVENT_ID'], how = "left") # Merge into ppmi_merge
+ppmi_merge = pd.merge(ppmi_merge, ppmi_merge_LD_only, on = ['PATNO','EVENT_ID'], how = "left") # Merge LD formlas into ppmi_merge 
+
+## GET LEVODOPA ONLY FOR BELOW CALCULATIONS - # FIXME - need more clarification before adding this 
+# LEDD_med_df = pd.read_csv(ppmi_download_path + 'LEDD_Concomitant_Medication_Log.csv', skipinitialspace = True) 
+# LEDD_med_df = LEDD_med_df[['PATNO','LEDTRT', 'LEDD', 'STARTDT', 'STOPDT']] # Keep only 
+# levodopa_only = LEDD_med_df[LEDD_med_df["LEDTRT"].str.contains("levodopa", case = False) == True] 
+# levodopa_only['STOPDT2'] = levodopa_only['STOPDT'] # Initialize second stop date variable
+# levodopa_only['STOPDT2'].fillna(levodopa_only['STARTDT'], inplace = True) # Fill in NaN stop dates with start dates # ASSUMPTION START and STOP on same month 
+# levodopa_only = levodopa_only.merge(levodopa_only.apply(lambda s: pd.date_range(s['STARTDT'], s.STOPDT2, freq='MS', inclusive = 'both'), 1).explode().rename('INFODT').dt.strftime('%m/%Y'), left_index=True, right_index=True) # Create a row for every month/year for LEDD 
+# levodopa_only.drop(['STOPDT2','STARTDT','STOPDT'], axis = 1, inplace = True) 
+# ppmi_merge_levodopa_only = ppmi_merge[['PATNO', 'EVENT_ID', 'INFODT']]
+# ppmi_merge_levodopa_only = pd.merge(ppmi_merge_levodopa_only, levodopa_only, on = ['PATNO', 'INFODT'], how = "left")
+# ppmi_merge_levodopa_only = ppmi_merge_levodopa_only[['PATNO', 'EVENT_ID', 'LEDD']] # keep only 
+# ppmi_merge_levodopa_only = ppmi_merge_levodopa_only.drop_duplicates() # with ongoing stop dates some overlap when merging on infodts so remove dups
+# ppmi_merge_levodopa_only = ppmi_merge_levodopa_only[ppmi_merge_levodopa_only["LEDD"].str.contains("LD") == False]  
+# ppmi_merge_levodopa_only = ppmi_merge_levodopa_only.astype({'LEDD' : 'float'})
+# ppmi_merge_levodopa_only = ppmi_merge_levodopa_only.groupby(['PATNO', 'EVENT_ID'])['LEDD'].sum().reset_index()
+# ppmi_merge_levodopa_only.rename(columns = {'LEDD' : 'Levodopa.only'}, inplace = True)
+
+# Calculate LD formulas and add to LEDD column numbers # FIXME need to switch calculation from LEDD to Levadopa only 
+for row_num in range(len(ppmi_merge)) :
+    if ppmi_merge['LD'].loc[row_num] == 'LD x 0.33' : 
+        ppmi_merge['LEDD.max'].loc[row_num] = float(ppmi_merge['LEDD.max'].loc[row_num]) * 0.33 + float(ppmi_merge['LEDD.max'].loc[row_num])
+        ppmi_merge['LEDD.sum'].loc[row_num] = float(ppmi_merge['LEDD.sum'].loc[row_num]) * 0.33 + float(ppmi_merge['LEDD.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == '(150.0 + LD) x 0.33' : 
+        ppmi_merge['LEDD.max'].loc[row_num] = (150.0 + float(ppmi_merge['LEDD.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.max'].loc[row_num])
+        ppmi_merge['LEDD.sum'].loc[row_num] = (150.0 + float(ppmi_merge['LEDD.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == '(600.0 + LD) x 0.33' :
+        ppmi_merge['LEDD.max'].loc[row_num] =  (600.0 + float(ppmi_merge['LEDD.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.max'].loc[row_num])
+        ppmi_merge['LEDD.sum'].loc[row_num] =  (600.0 + float(ppmi_merge['LEDD.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == 'LD x 0.5':
+        ppmi_merge['LEDD.max'].loc[row_num] = float(ppmi_merge['LEDD.max'].loc[row_num]) * 0.5 + float(ppmi_merge['LEDD.max'].loc[row_num])
+        ppmi_merge['LEDD.sum'].loc[row_num] = float(ppmi_merge['LEDD.sum'].loc[row_num]) * 0.5 + float(ppmi_merge['LEDD.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] =='(800.0 + LD) x 0.33':
+        ppmi_merge['LEDD.max'].loc[row_num] = (800.0 + float(ppmi_merge['LEDD.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.max'].loc[row_num])
+        ppmi_merge['LEDD.sum'].loc[row_num] = (800.0 + float(ppmi_merge['LEDD.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == '(300.0 + LD) x 0.33' :
+        ppmi_merge['LEDD.max'].loc[row_num] = (300.0 + float(ppmi_merge['LEDD.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.max'].loc[row_num])
+        ppmi_merge['LEDD.sum'].loc[row_num] = (300.0 + float(ppmi_merge['LEDD.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == '(225.0 + LD) x 0.33' : 
+        ppmi_merge['LEDD.max'].loc[row_num] = (225.0 + float(ppmi_merge['LEDD.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.max'].loc[row_num])
+        ppmi_merge['LEDD.sum'].loc[row_num] = (225.0 + float(ppmi_merge['LEDD.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == '(450.0 + LD) x 0.33' :
+        ppmi_merge['LEDD.max'].loc[row_num] = (450.0 + float(ppmi_merge['LEDD.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.max'].loc[row_num])
+        ppmi_merge['LEDD.sum'].loc[row_num] = (450.0 + float(ppmi_merge['LEDD.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.sum'].loc[row_num])
+ppmi_merge.drop(['LD'], axis = 1, inplace = True)
+
 
 ## LEDD Medication Status - FIXME Assumption : If stop date is NA we assume therapy is ongoing 
 LEDD_med_df = pd.read_csv(ppmi_download_path + 'LEDD_Concomitant_Medication_Log.csv', skipinitialspace = True) # LEDD medication history 
-LEDD_med_df = LEDD_med_df[['PATNO', 'LEDD', 'STARTDT', 'STOPDT']]
+LEDD_med_df = LEDD_med_df[['PATNO', 'LEDD', 'STARTDT', 'STOPDT']] # keep only 
 ppmi_merge['INFODT'] = pd.to_datetime(ppmi_merge['INFODT'], format = '%m%Y', errors = 'ignore') # Change to INFODT to type datetime so we can sort according to date 
 LEDD_med_df['STARTDT'] = pd.to_datetime(LEDD_med_df['STARTDT'], format = '%m%Y', errors = 'ignore') # Change to INFODT to type datetime so we can sort according to date 
 LEDD_med_df['STOPDT'] = pd.to_datetime(LEDD_med_df['STOPDT'], format = '%m%Y', errors = 'ignore') # Change to INFODT to type datetime so we can sort according to date 
-LEDD_med_df['STOPDT3'] = LEDD_med_df['STOPDT']
-LEDD_med_df['STOPDT3'].fillna('01/2022', inplace = True) # Fill in ongoing stopdate (12/2021 is max infodt in ppmi_merge file)
+LEDD_med_df['STOPDT3'] = LEDD_med_df['STOPDT'] 
+LEDD_med_df['STOPDT3'].fillna('01/2022', inplace = True) # ASSUMPTION fill in ongoing stopdate (12/2021 is max infodt in ppmi_merge file)
 LEDD_med_df['STOPDT3'] = pd.to_datetime(LEDD_med_df['STOPDT3'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
 LEDD_med_df = LEDD_med_df.merge(LEDD_med_df.apply(lambda s: pd.date_range(s.STARTDT, s.STOPDT3, freq='MS', inclusive = 'both'), 1).explode().rename('INFODT').dt.strftime('%m/%Y'), left_index=True, right_index=True) # Create a row for every month/year for LEDD 
 LEDD_med_df.rename(columns = {'LEDD' : 'LEDD.ongoing', 'STARTDT' : 'LEDD.STARTDT.ongoing', 'STOPDT3': 'LEDD.STOPDT.ongoing'}, inplace = True) # Rename 
 
-# If one event id has more than 1 LEDD entry - take max LEDD only FIXME
+# Get a new df with LEDD dates merged onto corect event ids through infodts 
 ppmi_merge_temp = ppmi_merge[['PATNO', 'EVENT_ID', 'INFODT']]
 ppmi_merge_temp = pd.merge(ppmi_merge_temp, LEDD_med_df, on = ['PATNO', 'INFODT'], how = "left")
 ppmi_merge_temp = ppmi_merge_temp[['PATNO', 'EVENT_ID', 'LEDD.ongoing', 'LEDD.STARTDT.ongoing', 'LEDD.STOPDT.ongoing']] # keep only 
-ppmi_merge_temp = ppmi_merge_temp[ppmi_merge_temp["LEDD.ongoing"].str.contains("LD") == False] # FIXME not sure what to do with LD x .33 etc rows - for now remove 
 
-# Create a column with True/False for LEDD rows we want to keep (max) or only LEDD for that date 
-subids = ppmi_merge_temp['PATNO'].unique() # Unique subject ids
-eventids = ppmi_merge_temp['EVENT_ID'].unique() # Unique event ids
-ppmi_merge_temp['LEDD_keep.ongoing'] = False
-for eventid in eventids : 
-    for subid in subids :
-        df = ppmi_merge_temp.loc[(ppmi_merge_temp['PATNO'] == subid) & (ppmi_merge_temp['EVENT_ID'] == eventid) & (ppmi_merge_temp['LEDD.ongoing'].notna())]
-        if len(df) == 1: 
-            idx = df.index
-            ppmi_merge_temp.loc[idx, 'LEDD_keep.ongoing'] = True
-        if len(df) > 1 : 
-            df['LEDD.ongoing'] = df['LEDD.ongoing'].astype(float)
-            maxidx = df['LEDD.ongoing'].idxmax()
-            ppmi_merge_temp.loc[maxidx, 'LEDD_keep.ongoing'] = True
-        
-LEDD_new_df = ppmi_merge_temp[ppmi_merge_temp['LEDD_keep.ongoing'] == True] # Keep only portion of df where LEDD_keep.ongoing == True (max or only LEDD entry)
-LEDD_new_df.drop(['LEDD_keep.ongoing'], axis = 1, inplace = True)
-ppmi_merge = pd.merge(ppmi_merge, LEDD_new_df, on = ['PATNO','EVENT_ID'], how = "left") # Merge into ppmi_merge
+# Df with LD formulas as variables 
+LD_only = ppmi_merge_temp[ppmi_merge_temp["LEDD.ongoing"].str.contains("LD")==True] # Get df with only columns that contain LD formula (i.e. LD x0.33)
+LD_only['STOPDT2'] = LD_only['LEDD.STOPDT.ongoing'] # Initialize second stop date variable
+LD_only['STOPDT2'].fillna('01/2022', inplace = True) # Fill in NaN stop dates with start dates # ASSUMPTION 
+LD_only['STOPDT2'] = pd.to_datetime(LD_only['STOPDT2'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date 
+LD_only = LD_only.merge(LD_only.apply(lambda s: pd.date_range(s['LEDD.STARTDT.ongoing'], s.STOPDT2, freq='MS', inclusive = 'both'), 1).explode().rename('INFODT').dt.strftime('%m/%Y'), left_index=True, right_index=True) # Create a row for every month/year for LEDD 
+LD_only.drop(['STOPDT2','EVENT_ID','LEDD.STARTDT.ongoing','LEDD.STOPDT.ongoing'], axis = 1, inplace = True) # Drop
+ppmi_merge_LD_only = ppmi_merge[['PATNO', 'EVENT_ID', 'INFODT']]
+ppmi_merge_LD_only = pd.merge(ppmi_merge_LD_only, LD_only, on = ['PATNO', 'INFODT'], how = "left")
+ppmi_merge_LD_only = ppmi_merge_LD_only[['PATNO', 'EVENT_ID', 'LEDD.ongoing']] # keep only 
+ppmi_merge_LD_only.rename(columns = {'LEDD.ongoing' : 'LD'}, inplace = True)
+ppmi_merge_LD_only = ppmi_merge_LD_only.drop_duplicates() # with ongoing stop dates some overlap when merging on infodts so remove dups
+
+# Df without LD formula var - only numeric LEDD vars 
+ppmi_merge_temp = ppmi_merge_temp[ppmi_merge_temp["LEDD.ongoing"].str.contains("LD") == False] # Remove LD from this df (add in later)
+ppmi_merge_temp = ppmi_merge_temp.astype({'LEDD.ongoing' : 'float'})
+LEDD_max = ppmi_merge_temp.loc[ppmi_merge_temp.groupby(['PATNO', 'EVENT_ID'])['LEDD.ongoing'].idxmax()].reset_index(drop=True)
+LEDD_max.rename(columns = {'LEDD.ongoing' : 'LEDD.ongoing.max'}, inplace = True) # Rename
+ppmi_merge = pd.merge(ppmi_merge, LEDD_max, on = ['PATNO','EVENT_ID'], how = "left") # Merge into ppmi_merge
+LEDD_sum = ppmi_merge_temp.groupby(['PATNO', 'EVENT_ID'])['LEDD.ongoing'].sum().reset_index() #  Sum
+LEDD_sum.rename(columns = {'LEDD.ongoing' : 'LEDD.ongoing.sum'}, inplace = True)
+ppmi_merge = pd.merge(ppmi_merge, LEDD_sum, on = ['PATNO','EVENT_ID'], how = "left") # Merge into ppmi_merge
+ppmi_merge = pd.merge(ppmi_merge, ppmi_merge_LD_only, on = ['PATNO','EVENT_ID'], how = "left") # Merge into ppmi_merge 
+
+# Calculate LD formulas and add to LEDD column numbers # FIXME need to switch calculation from LEDD to Levadopa only 
+for row_num in range(len(ppmi_merge)) :
+    if ppmi_merge['LD'].loc[row_num] == 'LD x 0.33' : 
+        ppmi_merge['LEDD.ongoing.max'].loc[row_num] = float(ppmi_merge['LEDD.ongoing.max'].loc[row_num]) * 0.33 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])
+        ppmi_merge['LEDD.ongoing.sum'].loc[row_num] = float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num]) * 0.33 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == '(150.0 + LD) x 0.33' : 
+        ppmi_merge['LEDD.ongoing.max'].loc[row_num] = (150.0 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])
+        ppmi_merge['LEDD.ongoing.sum'].loc[row_num] = (150.0 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == '(600.0 + LD) x 0.33' :
+        ppmi_merge['LEDD.ongoing.max'].loc[row_num] =  (600.0 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])
+        ppmi_merge['LEDD.ongoing.sum'].loc[row_num] =  (600.0 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == 'LD x 0.5':
+        ppmi_merge['LEDD.ongoing.max'].loc[row_num] = float(ppmi_merge['LEDD.ongoing.max'].loc[row_num]) * 0.5 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])
+        ppmi_merge['LEDD.ongoing.sum'].loc[row_num] = float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num]) * 0.5 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] =='(800.0 + LD) x 0.33':
+        ppmi_merge['LEDD.ongoing.max'].loc[row_num] = (800.0 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])
+        ppmi_merge['LEDD.ongoing.sum'].loc[row_num] = (800.0 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == '(300.0 + LD) x 0.33' :
+        ppmi_merge['LEDD.ongoing.max'].loc[row_num] = (300.0 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])
+        ppmi_merge['LEDD.ongoing.sum'].loc[row_num] = (300.0 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == '(225.0 + LD) x 0.33' : 
+        ppmi_merge['LEDD.ongoing.max'].loc[row_num] = (225.0 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])
+        ppmi_merge['LEDD.ongoing.sum'].loc[row_num] = (225.0 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])
+    elif ppmi_merge['LD'].loc[row_num] == '(450.0 + LD) x 0.33' :
+        ppmi_merge['LEDD.ongoing.max'].loc[row_num] = (450.0 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.max'].loc[row_num])
+        ppmi_merge['LEDD.ongoing.sum'].loc[row_num] = (450.0 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])) * 0.33 + float(ppmi_merge['LEDD.ongoing.sum'].loc[row_num])
 ppmi_merge['LEDD.STOPDT.ongoing'].replace({'01/2022'  : np.NaN}, inplace = True) # Replace filler stop date for ledd ongoing back to nan
+ppmi_merge.drop(['LD'], axis = 1, inplace = True)
 
 
 ## Comorbidities # FIXME not useful column 
@@ -352,7 +432,7 @@ ppmi_merge['Analytic.Cohort'].loc[analytic_cohort] = 'Analytic Cohort'
 ppmi_merge['Analytic.Cohort'].fillna('Not Analytic Cohort', inplace = True)
 
 ## Reindex 
-ppmi_merge = ppmi_merge.reindex(columns = ['PATNO', 'EVENT_ID', 'INFODT' , 'Enroll.Diagnosis', 'Enroll.Subtype', 'Consensus.Diagnosis', 'Consensus.Subtype','Analytic.Cohort','Subject.Phenoconverted','First.Diagnosis.Change', 'Second.Diagnosis.Change',  'First.Symptom.Date', 'PD.Diagnosis.Date', 'PD.Diagnosis.Duration','BirthDate', 'Age', 'Sex', 'Handed', 'Weight(kg)',	'Height(cm)', 'Education.Years', 'DOMSIDE', 'African.Berber.Race','Ashkenazi.Jewish.Race', 'Basque.Race', 'Hispanic.Latino.Race', 'Asian.Race', 'African.American.Race', 'Hawian.Other.Pacific.Islander.Race', 'Indian.Alaska.Native.Race', 'Not.Specified.Race',  'White.Race', 'Motor.Function.Page.Name',	'Motor.Function.Source',	'Trouble.Rising.Chair',	'Writing.Smaller',	'Voice.Softer',	'Poor.Balance',	'Feet.Stuck',	'Less.Expressive',	'Arms/Legs.Shake',	'Trouble.Buttons',	'Shuffle.Feet',	'Slow.Movements',	'Been.Told.PD',	'Cognitive.Page.Name',	'Cognitive.Source', 'Cognitive.Decline',	'Functional.Cognitive.Impairment',	'Confidence.Level.Cognitive.Diagnosis',	'Cognitive.State',	'Cognitive.Tscore.Cat',	'MOCA.Total', 'Medication' , 'LEDD' , 'LEDD.STARTDT' , 'LEDD.STOPDT', 'LEDD.ongoing', 'LEDD.STARTDT.ongoing', 'LEDD.STOPDT.ongoing','Medical.History.Description(Diagnosis.Date)'])
+ppmi_merge = ppmi_merge.reindex(columns = ['PATNO', 'EVENT_ID', 'INFODT' , 'Enroll.Diagnosis', 'Enroll.Subtype', 'Consensus.Diagnosis', 'Consensus.Subtype','Analytic.Cohort','Subject.Phenoconverted','First.Diagnosis.Change', 'Second.Diagnosis.Change',  'First.Symptom.Date', 'PD.Diagnosis.Date', 'PD.Diagnosis.Duration','BirthDate', 'Age', 'Sex', 'Handed', 'Weight(kg)',	'Height(cm)', 'Education.Years', 'DOMSIDE', 'African.Berber.Race','Ashkenazi.Jewish.Race', 'Basque.Race', 'Hispanic.Latino.Race', 'Asian.Race', 'African.American.Race', 'Hawian.Other.Pacific.Islander.Race', 'Indian.Alaska.Native.Race', 'Not.Specified.Race',  'White.Race', 'Motor.Function.Page.Name',	'Motor.Function.Source',	'Trouble.Rising.Chair',	'Writing.Smaller',	'Voice.Softer',	'Poor.Balance',	'Feet.Stuck',	'Less.Expressive',	'Arms/Legs.Shake',	'Trouble.Buttons',	'Shuffle.Feet',	'Slow.Movements',	'Been.Told.PD',	'Cognitive.Page.Name',	'Cognitive.Source', 'Cognitive.Decline',	'Functional.Cognitive.Impairment',	'Confidence.Level.Cognitive.Diagnosis',	'Cognitive.State',	'Cognitive.Tscore.Cat',	'MOCA.Total', 'Medication' , 'LEDD.max' , 'LEDD.STARTDT' , 'LEDD.STOPDT', 'LEDD.sum', 'LEDD.ongoing.max', 'LEDD.STARTDT.ongoing', 'LEDD.STOPDT.ongoing','LEDD.ongoing.sum','Medical.History.Description(Diagnosis.Date)'])
 
 ## Add in other csvs
 ppmi_merge = merge_new_csv(ppmi_merge, 'Modified_Boston_Naming_Test.csv', ['PATNO', 'EVENT_ID', 'MBSTNSCR', 'MBSTNCRC', 'MBSTNCRR', 'MBSTNVRS'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
@@ -657,6 +737,11 @@ ppmi_merge.rename(columns = {'EVENT_ID': 'Event.ID', 'INFODT' : 'Event.ID.Date',
 # Change names of event ids to be indicative of months
 ppmi_merge['Event.ID'].replace({'FNL' : 'Final Visit', 'BL' : 'Baseline', 'SC' : 'Screening', 'LOG' : 'Logs', 'PW' : 'Premature Withdrawal', 'R04' : 'Remote Visit Month 18', 'R06' : 'Remote Visit Month 18', 'R08' : 'Remote Visit Month 42', 'R10' : 'Remote Visit Month 54', 'R12' : 'Remote Visit Month 66', 'R13' : 'Remote Visit Month 78' , 'R14' : 'Remote Visit Month 90' , 'R15' : 'Remote Visit Month 102' , 'R16' : 'Remote Visit Month 114', 'R17' : 'Remote Visit Month 126', 'RS1' : 'Re-screen', 'ST' : 'Symptomatic Therapy', 'U01' : 'Unscheduled Visit 1', 'U02' : 'Unscheduled Visit 2', 'V01' : 'Visit Month 3', 'V02' : 'Visit Month 6', 'V03' : 'Visit Month 9', 'V04' : 'Visit Month 12', 'V05' : 'Visit Month 18', 'V06' : 'Visit Month 24', 'V07' : 'Visit Month 30', 'V08' : 'Visit Month 36', 'V09' : 'Visit Month 42', 'V10' : 'Visit Month 48', 'V11' : 'Visit Month 54','V12' : 'Visit Month 60', 'V13' : 'Visit Month 72', 'V14' : 'Visit Month 84', 'V15' : 'Visit Month 96', 'V16' : 'Visit Month 108', 'V17' : 'Visit Month 120', 'V18' : 'Visit Month 132', 'P78' : 'Phone Visit (Month 78)'}, inplace = True) 
 
+race_list = ['African.Berber.Race','Ashkenazi.Jewish.Race', 'Basque.Race','Hispanic.Latino.Race', 'Asian.Race', 'African.American.Race', 'Hawian.Other.Pacific.Islander.Race', 'Indian.Alaska.Native.Race', 'Not.Specified.Race',  'White.Race']
+for col_name in race_list :
+    ppmi_merge[col_name].replace({0 : 'No', 1 : 'Yes', 2 : np.NaN}, inplace = True) 
+ppmi_merge.to_csv('/Users/areardon/Desktop/ppmi_mergex.csv')
+
 # Fill in cells that are NA with subject information that we know from other event ids/rows for fixed variables
 fixed_var_list = ['Enroll.Diagnosis', 'Enroll.Subtype','Consensus.Diagnosis', 'Consensus.Subtype', 'Subject.Phenoconverted', 'BirthDate', 'Sex', 'Handed', 'Analytic.Cohort','African.Berber.Race','Ashkenazi.Jewish.Race', 'Basque.Race', 'Hispanic.Latino.Race', 'Asian.Race', 'African.American.Race', 'Hawian.Other.Pacific.Islander.Race', 'Indian.Alaska.Native.Race', 'Not.Specified.Race',  'White.Race'] # fixed variables
 for col_name in fixed_var_list : 
@@ -672,7 +757,7 @@ ppmi_merge.replace({'NA' : np.nan}, inplace = True)
 
 race_list = ['African.Berber.Race','Ashkenazi.Jewish.Race', 'Basque.Race','Hispanic.Latino.Race', 'Asian.Race', 'African.American.Race', 'Hawian.Other.Pacific.Islander.Race', 'Indian.Alaska.Native.Race', 'Not.Specified.Race',  'White.Race']
 for col_name in race_list :
-    ppmi_merge[col_name].replace({0 :False , 1 : True, 2 : np.NaN}, inplace = True) 
+    ppmi_merge[col_name].replace({'No' :False , 'Yes' : True, 2 : np.NaN}, inplace = True) 
 
 
 #### GENETICS INFO ####
