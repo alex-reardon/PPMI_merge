@@ -237,6 +237,15 @@ ppmi_merge.rename(columns = {'MCATOT' : 'MOCA.Total'}, inplace = True) # Rename
 ## Medication Status - Concomitant Med Log # FIXME not a useful way to show medication status 
 med_df = pd.read_csv(ppmi_download_path + 'Concomitant_Medication_Log.csv', skipinitialspace=True) # Medication history 
 med_df.replace({';' : ','}, regex = True, inplace = True) # Replace ';' with ',' in med_df
+
+# FIXME - do we want to get rid of certain supplements we aren't interested in?  Or leave all? 
+med_df = pd.read_csv('/Users/areardon/Desktop/ppmi_merge/PPMI_Study_Data_Download/Concomitant_Medication_Log.csv')
+med_df['CMTRT'] = med_df['CMTRT'].str.title() # Capitalize all medication names 
+med_df['CMTRT'] = med_df['CMTRT'].str.strip()
+n = 20 # FIXME how many of these to keep 
+selection = med_df['CMTRT'].value_counts()[:n].index.tolist()
+med_df = med_df.loc[med_df['CMTRT'].isin(selection)]
+
 med_df['CMTRT'] = med_df['CMTRT'].str.title() # Capitalize all medication names 
 med_df['STARTDT'].fillna('NA', inplace = True) # Fillna
 med_df['STOPDT'].fillna('NA', inplace = True) # Fillna
@@ -425,6 +434,51 @@ ppmi_merge.drop(['LD'], axis = 1, inplace = True)
 ## Comorbidities # FIXME not useful column 
 comorbid_df = pd.read_csv(ppmi_download_path + 'Medical_Conditions_Log.csv', skipinitialspace=True) # Medication history 
 comorbid_df.replace({';' : ','}, regex = True, inplace = True) # Replace ';' with ','
+
+
+## Replace comorbid MHTERM columns with common names 
+# FIXME still need to take care of other medical conditions such as - tinnitus, vertigo, cholesterol, diabetes 2 mellitus, arthritis, pre diabetes, copd, 
+comorbid_df = pd.read_csv('/Users/areardon/Desktop/ppmi_merge/PPMI_Study_Data_Download/Medical_Conditions_Log.csv')
+comorbid_df['MHTERM'] = comorbid_df['MHTERM'].replace({"'s": "s"})
+comorbid_df['MHTERM'] = comorbid_df['MHTERM'].str.lower() # Capitalize all medication names 
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*parkin.*$)', 'parkinson')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*diabetes.*$)', 'diabetes') # FIXME 
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*sulfa.*$)', 'sulfa allergy')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*nickel allergy.*$)', 'nickel allergy')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*herpes.*$)', 'herpes') # FIXME 
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*lactose.*$)', 'lactose intolerance')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*hypothyroid.*$)', 'hypothyroidism')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*back pain.*$)', 'back pain') # FIXME can i combine lower back pain, with chronic back pain, etc,
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*rem .*$)', 'rem sleep behavior disorder')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*kidney stone.*$)', 'kidney stones')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*migraine.*$)', 'migraines')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*near.*$)', 'myopia') # FIXME
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*headache.*$)', 'migraines') # FIXME chronic headache = migraine? not a doctor
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*covid.*$)', 'covid-19')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*cramps.*$)', 'muscle cramps')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*attention deficit.*$)', 'adhd')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*high blood pressure (hypertension).*$)', 'hypertension')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*trigger finger.*$)', 'trigger finger')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*squamous.*$)', 'squamous cell carcinoma')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*osteoarthritis.*$)', 'osteoarthritis')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*fatigue.*$)', 'fatigue') # FIXME
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*sjögren.*$)', 'sjogren\'s syndrome')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*erythromycin.*$)', 'erythromycin allergy')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*osteo arthritis.*$)', 'osteoarthritis')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*bursitis.*$)', 'bursitis')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*shoulder injury.*$)', 'shoulder injury') # combine left and right shoulder injury
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*gaucher.*$)', 'gauchers disease')
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*knee replacement.*$)', 'knee replacement') # FIXME can i combine left knee/ right knee, total knee - with knee replacement
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*meniscus.*$)', 'torn meniscus') # FIXME can i combine left knee/ right knee, total knee - with knee replacement
+comorbid_df['MHTERM'] = comorbid_df.MHTERM.str.replace(r'(^.*cataract.*$)', 'cataracts') # FIXME can i combine bilateral cateracts, with cataract, with cataract surgury, etc. 
+comorbid_df['MHTERM'] = comorbid_df['MHTERM'].str.strip()
+comorbid_df['MHTERM'].replace({'high cholestrol': 'high cholesterol','low red blood cell count':'low red cell count','anxiety depressive disorder': 'depression/anxiety','clinical depression': 'depression', 'allergy to dust': 'dust allergy','penicilin allergy': 'penicillin allergy','allergy to penicillin':'penicillin allergy', 'depression anxiety disorder':'depression/anxiety','anxiety/depression':'depression/anxiety', 'depression disorder':'depression', 'restless legs syndrome': 'restless leg syndrome','cesarean section': 'c-section','acid reflux disease': 'acid reflux','gastroesophageal reflux disorder':'gastroesophageal reflux disease', 'osteo arthritis' : 'osteoarthritis','allergy to cats': 'cat allergy','diabetes type ii' : 'type 2 diabetes', 'rbd' : 'rem sleep behavior disorder', 'gastroesophageal reflux disease (gerd)':'gastroesophageal reflux disease', 'seasonal allergy': 'seasonal allergies', 'gastroesophageal reflux': 'gastroesophageal reflux disease',  'type ii diabetes': 'type 2 diabetes','bph':'benign prostatic hypertrophy','anxiety disorder': 'anxiety', 'sulfa drug allergy' : 'sulfa allergy','refraction error': 'error of refraction', 'lower back pain' : 'low back pain','gerd' : 'gastroesophageal reflux disease','post menopausal' : 'postmenopausal', 'post-menopausal':'postmenopausal' , 'elevated cholesterol':'high cholesterol', 'hypercholesterolemia' : 'high cholesterol', 'hyperlipidemia' : 'high cholesterol'}, inplace = True)
+
+# Get list of top n comorbidities/ medical history descriptions
+n = 20 # FIXME how many of these to keep? 
+selection = comorbid_df['MHTERM'].value_counts()[:n].index.tolist()
+comorbid_df = comorbid_df.loc[comorbid_df['MHTERM'].isin(selection)]
+
 comorbid_df = comorbid_df[['PATNO', 'EVENT_ID', 'MHDIAGDT','MHTERM']] # keep only 
 comorbid_df['MHTERM'] = comorbid_df['MHTERM'].str.capitalize() # Capitalize all MHTERM names 
 comorbid_df['MHDIAGDT'].fillna('NA', inplace = True) # If no diagnosis date - fill in with NA
@@ -721,7 +775,7 @@ for col_name in race_list :
     ppmi_merge[col_name].replace({0 : 'No', 1 : 'Yes', 2 : np.NaN}, inplace = True) 
 
 # Fill in cells that are NA with subject information that we know from other event ids/rows for fixed variables
-fixed_var_list = ['Enroll.Diagnosis', 'Enroll.Subtype','Consensus.Diagnosis', 'Consensus.Subtype', 'Subject.Phenoconverted', 'BirthDate', 'Sex', 'Handed', 'Analytic.Cohort','African.Berber.Race','Ashkenazi.Jewish.Race', 'Basque.Race', 'Hispanic.Latino.Race', 'Asian.Race', 'African.American.Race', 'Hawian.Other.Pacific.Islander.Race', 'Indian.Alaska.Native.Race', 'Not.Specified.Race',  'White.Race'] # fixed variables
+fixed_var_list = ['Dominant.Side.Disease', 'Enroll.Diagnosis', 'Enroll.Subtype','Consensus.Diagnosis', 'Consensus.Subtype', 'Subject.Phenoconverted', 'BirthDate', 'Sex', 'Handed', 'Analytic.Cohort','African.Berber.Race','Ashkenazi.Jewish.Race', 'Basque.Race', 'Hispanic.Latino.Race', 'Asian.Race', 'African.American.Race', 'Hawian.Other.Pacific.Islander.Race', 'Indian.Alaska.Native.Race', 'Not.Specified.Race',  'White.Race'] # fixed variables
 for col_name in fixed_var_list : 
     ppmi_merge[col_name].fillna('NA', inplace = True)
     for row_num in range(len(ppmi_merge[col_name])):
@@ -870,9 +924,9 @@ brady_sym3a = ['Dominant.Side.Disease', 'Rigidity.Neck.UPDRS3A.Num', 'Rigidity.R
 brady_sym3ON = ['Dominant.Side.Disease', 'Rigidity.Neck.UPDR3ON.Num', 'Rigidity.RUE.UPDR3ON.Num', 'Rigidity.LUE.UPDR3ON.Num', 'Rigidity.RLE.UPDR3ON.Num', 'Rigidity.LLE.UPDR3ON.Num', 'Finger.Tapping.Right.Hand.UPDR3ON.Num', 'Finger.Tapping.Left.Hand.UPDR3ON.Num', 'Hand.Movements.Right.Hand.UPDR3ON.Num', 'Hand.Movements.Left.Hand.UPDR3ON.Num', 'Pronation.Supination.Right.Hand.UPDR3ON.Num', 'Pronation.Supination.Left.Hand.UPDR3ON.Num', 'Toe.Tapping.Right.Foot.UPDR3ON.Num', 'Toe.Tapping.Left.Foot.UPDR3ON.Num', 'Leg.Agility.Right.Leg.UPDR3ON.Num', 'Leg.Agility.Left.Leg.UPDR3ON.Num']
 brady_sym3OF = ['Dominant.Side.Disease', 'Rigidity.Neck.UPDR3OF.Num', 'Rigidity.RUE.UPDR3OF.Num', 'Rigidity.LUE.UPDR3OF.Num', 'Rigidity.RLE.UPDR3OF.Num', 'Rigidity.LLE.UPDR3OF.Num', 'Finger.Tapping.Right.Hand.UPDR3OF.Num', 'Finger.Tapping.Left.Hand.UPDR3OF.Num', 'Hand.Movements.Right.Hand.UPDR3OF.Num', 'Hand.Movements.Left.Hand.UPDR3OF.Num', 'Pronation.Supination.Right.Hand.UPDR3OF.Num', 'Pronation.Supination.Left.Hand.UPDR3OF.Num', 'Toe.Tapping.Right.Foot.UPDR3OF.Num', 'Toe.Tapping.Left.Foot.UPDR3OF.Num', 'Leg.Agility.Right.Leg.UPDR3OF.Num', 'Leg.Agility.Left.Leg.UPDR3OF.Num']
 
-# Make any dominant side of disease that are NA into 'Symmetric' 
-domsideisna = ppmi_merge['Dominant.Side.Disease'].isna()
-ppmi_merge['Dominant.Side.Disease'].loc[domsideisna] = 'Symmetric'
+# # # Make any dominant side of disease that are NA into 'Symmetric' 
+# # domsideisna = ppmi_merge['Dominant.Side.Disease'].isna()
+# # ppmi_merge['Dominant.Side.Disease'].loc[domsideisna] = 'Symmetric'
 
 def add_lateralized_subscores(df : pd.DataFrame, subscore_side_list : list, side : str, new_col_name : str) :
     """
