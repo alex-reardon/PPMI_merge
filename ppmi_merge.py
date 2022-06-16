@@ -470,7 +470,7 @@ def make_equal_categorical_column(df, df_col, new_df_col, num_categories) :
     return df
 
 ppmi_merge = make_equal_categorical_column(ppmi_merge, 'LEDD.sum', 'LEDD.sum.Cat', 3) 
-ppmi_merge = make_equal_categorical_column(ppmi_merge, 'LEDD.sum.ongoing', 'LEDD.sum.ongoing.Cat',3)
+ppmi_merge = make_equal_categorical_column(ppmi_merge, 'LEDD.ongoing.sum', 'LEDD.ongoing.sum.Cat',3)
 
 
 ## Comorbidities # FIXME not useful column 
