@@ -3,13 +3,13 @@ import numpy as np
 import boto3
 from datetime import datetime
 from dateutil import relativedelta
-
+from io import StringIO 
 
 userdir = '/Users/areardon/Desktop/ppmi_merge/'
 ppmi_download_path = userdir + 'PPMI_Study_Data_Download/'
 invicro_data_path = userdir
 genetics_path = userdir + 'genetic_data/'
-version = '0.0.4' 
+version = '0.0.41' 
 
 
 def create_cohort_df(xlsx, sheet) :
@@ -901,12 +901,43 @@ for row_num in range(len(ppmi_merge['T1.s3.Image.Name'])) :
     if isinstance(ppmi_merge['T1.s3.Image.Name'].iloc[row_num],str) :
         date = ppmi_merge['T1.s3.Image.Name'].iloc[row_num].split('-')[2]
         ppmi_merge['Image.Acquisition.Date'].iloc[row_num] = date[4:6] + '/' + date[6:8] +'/' + date[0:4]
-ppmi_merge.to_csv('/Users/areardon/Desktop/ppmi_merge916.csv')
+
+## temp start 
+## Merge in FA results 
+def merge_dti_results(ppmi_merge, bucket, prefix, search_string, merge_on) : 
+    print(f"Merge in {search_string}")
+    dti = search_s3(bucket, prefix, search_string)
+    client = boto3.client('s3', region_name="us-east-1")
+    appended_data = []
+    for key in dti : 
+        subid = key.split('/')[2]
+        subid = np.int64(subid)  
+        date = key.split('/') [3]
+        month_date = date[4:6] + '/' + date[0:4] 
+        image_id = key.split('/')[5]
+        csv_obj = client.get_object(Bucket='ppmi-dti', Key = key)
+        body = csv_obj['Body']
+        csv_string = body.read().decode('utf-8')
+        df = pd.read_csv(StringIO(csv_string))
+        df.drop(['u_hier_id','u_hier_id.1'], axis = 1, inplace = True)
+        df['Subject.ID'] = subid
+        df['Event.ID.Date'] = month_date
+        df['DTI.antspymm.Image.ID'] = image_id
+        if 'md' in search_string : # FIXME- if you fix md labels you can get rid of this 
+            df.columns = df.columns.str.replace("fa", "md") # FIXME - if you fix md labels you can get rid of this 
+        appended_data.append(df)
+    appended_data_dti = pd.concat(appended_data)
+    ppmi_merge = pd.merge(ppmi_merge, appended_data_dti, on = merge_on, how = "outer")
+    return ppmi_merge
+
+ppmi_merge = merge_dti_results(ppmi_merge, 'ppmi-dti', 'antspymm/PPMI/', 'mean_fa_summary', ['Subject.ID', 'Event.ID.Date'])
+ppmi_merge = merge_dti_results(ppmi_merge, 'ppmi-dti', 'antspymm/PPMI/', 'mean_md_summary', ['Subject.ID','Event.ID.Date', 'DTI.antspymm.Image.ID'])
+## temp end 
 
 ## Add in 'Analytic.Cohort' column
 analytic_cohort_subids = analytic_cohort_subids.tolist()
 ppmi_merge['Analytic.Cohort'] = ppmi_merge['Subject.ID'].map(lambda x : 'Analytic Cohort' if x in analytic_cohort_subids  else 'Not Analytic Cohort') 
-ppmi_merge.to_csv('/Users/areardon/Desktop/ppmi_merge10.csv')
+ppmi_merge.to_csv('/Users/areardon/Desktop/ppmi_merge_941.csv')
 
 ## Get Enrollment Diagnosis for subjects in Not Analytic Cohort - do this using the participants_status.csv
 analytic = ppmi_merge[ppmi_merge['Analytic.Cohort'] == 'Analytic Cohort'] # Split up Analytic cohort df and not Analytic Cohort df
@@ -947,6 +978,7 @@ for row_num in range(len(ppmi_merge['ImageID'])) :
         imageID = ppmi_merge['T1.s3.Image.Name'].iloc[row_num].split('.')[0] # take info before .nii.gz
         ppmi_merge['ImageID'].iloc[row_num] = imageID.split('-')[1] + '-' + imageID.split('-')[2] + '-' + imageID.split('-')[4]
 ppmi_merge = pd.merge(ppmi_merge, ppmi_qc_BA, on = ['ImageID'], how = "left") # Merge - keep only from ImageIDs we already have
+ppmi_merge.to_csv('/Users/areardon/Desktop/ppmi_merge_982.csv')
 
 #### BILATERAL SUBTYPE SCORES (Tremor and Brady) ####
 brady_right3 = ['Dominant.Side.Disease', 'Rigidity.Neck.UPDRS3.Num', 'Rigidity.RUE.UPDRS3.Num', 'Rigidity.RLE.UPDRS3.Num', 'Finger.Tapping.Right.Hand.UPDRS3.Num', 'Hand.Movements.Right.Hand.UPDRS3.Num', 'Pronation.Supination.Right.Hand.UPDRS3.Num', 'Toe.Tapping.Right.Foot.UPDRS3.Num', 'Leg.Agility.Right.Leg.UPDRS3.Num']
@@ -1030,16 +1062,17 @@ ppmi_merge = fill_non_lat_subscore(ppmi_merge, 'Brady.Rigidity.Subscore.laterali
 myevs = ppmi_merge['Event.ID'].unique() # Unique event ids
 uids = ppmi_merge['Subject.ID'].unique() # Unique subject ids
 for myev in myevs :
-    mybe = "best" + myev # Create best Visit column
-    ppmi_merge[mybe] = False # Set all best visit to be False
-    for u in uids :
-        selu = ppmi_merge.loc[(ppmi_merge['Subject.ID'] == u) & (ppmi_merge['Event.ID'] == myev) & (ppmi_merge['resnetGrade'].notna())] # For one subject at one event id if resnetGrade not na
-        if len(selu) == 1 : # If there is one event id for that subject
-            idx = selu.index # Ge the index
-            ppmi_merge.loc[idx, mybe] = True
-        if len(selu) > 1 : # IF there is more than one event id for that subject and resnet grade is not na
-            maxidx = selu[['resnetGrade']].idxmax() # Get the higher resnetGrade for each visit if there are more than one
-            ppmi_merge.loc[maxidx, mybe] = True
+    if not isNaN(myev) : 
+        mybe = "best" + myev # Create best Visit column
+        ppmi_merge[mybe] = False # Set all best visit to be False
+        for u in uids :
+            selu = ppmi_merge.loc[(ppmi_merge['Subject.ID'] == u) & (ppmi_merge['Event.ID'] == myev) & (ppmi_merge['resnetGrade'].notna())] # For one subject at one event id if resnetGrade not na
+            if len(selu) == 1 : # If there is one event id for that subject
+                idx = selu.index # Ge the index
+                ppmi_merge.loc[idx, mybe] = True
+            if len(selu) > 1 : # IF there is more than one event id for that subject and resnet grade is not na
+                maxidx = selu[['resnetGrade']].idxmax() # Get the higher resnetGrade for each visit if there are more than one
+                ppmi_merge.loc[maxidx, mybe] = True
 
 ## Include a column for bestAtImage.Acquisition.Date - denote the one or highest resnetGrade with True (else = False)
 ppmi_merge['bestAtImage.Acquisition.Date'] = False # Initialize bestAtImage.Acuqisition.Date col
