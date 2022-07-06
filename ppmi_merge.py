@@ -9,7 +9,7 @@ userdir = '/Users/areardon/Desktop/ppmi_merge/'
 ppmi_download_path = userdir + 'PPMI_Study_Data_Download/'
 invicro_data_path = userdir
 genetics_path = userdir + 'genetic_data/'
-version = '0.0.3' 
+version = '0.0.4' 
 
 
 def create_cohort_df(xlsx, sheet) :
@@ -882,6 +882,25 @@ genetics_df.replace({-9999.0 : 'NA'}, inplace = True)
 # Merge ppmi_merge with genetics df
 ppmi_merge_genetics = pd.merge(ppmi_merge, genetics_df, on = 'Subject.ID', how = "outer")
 
+
+## Add in Brian's snp_rs6265_recode.csv file sent on slack 6/29/22
+snp_recode = pd.read_csv(genetics_path + 'snp_rs6265_recode.csv')
+snp_recode.drop(['CHR', 'POS', 'COUNTED', 'ALT', 'SNP', '(C)M'], axis = 1, inplace = True) # Remove unnecessary columns
+# Change column names to be just subid
+for col in snp_recode:
+    if '_' in col :
+        subid = int(col.split('_')[-1])
+        snp_recode.rename(columns = {col : subid}, inplace = True)
+
+snp_recode = snp_recode.T # Transpose df so that rows are subid
+snp_recode.index.name = 'Subject.ID'
+snp_recode.columns = ['snp_rs6265']
+snp_recode['snp_rs6265'] = snp_recode['snp_rs6265'].fillna(-9999.0)
+snp_recode['snp_rs6265'] = snp_recode['snp_rs6265'].astype(int)
+snp_recode.fillna('NA', inplace = True)
+ppmi_merge_genetics = pd.merge(ppmi_merge_genetics, snp_recode, on = ['Subject.ID'], how = "outer")
+
+
 #### T1 Info - Taylor's File ####
 ppmi_t1_df = pd.read_csv(invicro_data_path + 'ppmi_mergewide_t1.csv') # Read in Taylor's T1 results file
 ppmi_t1_df.rename(columns = {'u_hier_id_OR': 'Subject.ID'}, inplace = True) # Rename subject id column in Taylors df to match ppmi_merge
@@ -902,7 +921,6 @@ for row_num in range(len(ppmi_merge['T1.s3.Image.Name'])) :
         date = ppmi_merge['T1.s3.Image.Name'].iloc[row_num].split('-')[2]
         ppmi_merge['Image.Acquisition.Date'].iloc[row_num] = date[4:6] + '/' + date[6:8] +'/' + date[0:4]
 
-## temp start 
 ## Merge in FA results 
 def merge_dti_results(ppmi_merge, bucket, prefix, search_string, merge_on) : 
     print(f"Merge in {search_string}")
@@ -915,7 +933,7 @@ def merge_dti_results(ppmi_merge, bucket, prefix, search_string, merge_on) :
         date = key.split('/') [3]
         month_date = date[4:6] + '/' + date[0:4] 
         image_id = key.split('/')[5]
-        csv_obj = client.get_object(Bucket='ppmi-dti', Key = key)
+        csv_obj = client.get_object(Bucket=bucket, Key = key)
         body = csv_obj['Body']
         csv_string = body.read().decode('utf-8')
         df = pd.read_csv(StringIO(csv_string))
@@ -932,7 +950,6 @@ def merge_dti_results(ppmi_merge, bucket, prefix, search_string, merge_on) :
 
 ppmi_merge = merge_dti_results(ppmi_merge, 'ppmi-dti', 'antspymm/PPMI/', 'mean_fa_summary', ['Subject.ID', 'Event.ID.Date'])
 ppmi_merge = merge_dti_results(ppmi_merge, 'ppmi-dti', 'antspymm/PPMI/', 'mean_md_summary', ['Subject.ID','Event.ID.Date', 'DTI.antspymm.Image.ID'])
-## temp end 
 
 ## Add in 'Analytic.Cohort' column
 analytic_cohort_subids = analytic_cohort_subids.tolist()
