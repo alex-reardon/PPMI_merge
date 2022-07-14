@@ -9,7 +9,8 @@ userdir = '/Users/areardon/Desktop/ppmi_merge/'
 ppmi_download_path = userdir + 'PPMI_Study_Data_Download/'
 invicro_data_path = userdir
 genetics_path = userdir + 'genetic_data/'
-version = '0.0.4' 
+datiq_path = userdir + 'datiq/'
+version = '0.0.5' 
 
 
 def create_cohort_df(xlsx, sheet) :
@@ -593,6 +594,92 @@ dup_subid_list = [] # Initialize duplicate subid list variable
 [dup_subid_list.append(index) for index in duplicate_datscan_index if ppmi_merge['DATSCAN'][index] == 'Not Completed']# Get the indices of duplicate subids that were labeled as Not Completed
 ppmi_merge = ppmi_merge.reset_index(drop = True)
 [ppmi_merge.drop(index = i, axis = 1, inplace = True) for i in reversed(dup_subid_list) if ppmi_merge['DATSCAN'][i] == 'Not Completed'] # Get rid of the duplicate subids that were labeled as Not Completed
+
+## TEMP START 
+## Read in Dat iq file 
+datiq = pd.ExcelFile(datiq_path + 'IQDAT_PPMI_PDHCproromalPD_12July2022_send.xlsx') # Read in datiq file
+
+## Split bu sheet 
+pd_datiq = pd.read_excel(datiq, 'PD')
+hc_datiq = pd.read_excel(datiq, 'HC')
+prodromal_datiq = pd.read_excel(datiq, 'prodromalPD')
+
+## Organize each df 
+pd_datiq.drop('#', axis = 1, inplace = True)
+hc_datiq.drop('#', axis = 1, inplace = True)
+prodromal_datiq.drop('#', axis = 1, inplace = True)
+
+
+# Create a column for object name to merge on with ppmi_merge
+pd_datiq['PATNO'] = ''
+pd_datiq['INFODT'] = ''
+hc_datiq['PATNO'] = ''
+hc_datiq['INFODT'] = ''
+
+dfs = [pd_datiq, hc_datiq]
+for df in dfs : 
+    for row_num in range(len(df['subjNames'])) :
+        subid = df['subjNames'].iloc[row_num].split('_')[0]
+        date = df['subjNames'].iloc[row_num].split('_')[1]
+        date = date.split('-')[0]
+        df['PATNO'].iloc[row_num] = subid
+        df['INFODT'].iloc[row_num] = date
+    
+pd_datiq.drop('subjNames', axis = 1, inplace = True)
+hc_datiq.drop('subjNames', axis = 1, inplace = True)
+
+
+# Fix prodromal dates using prodromalPD sheet Zhen sent 
+prodromal_info = pd.read_csv(datiq_path + 'DATIQ_results_ver2_prodromalPD_IDsheets.csv')
+prodromal_info['INFODT'] = ''
+count = 0
+for date in prodromal_info['ScanDate'] :
+    prodromal_info['INFODT'].iloc[count] = datetime.strptime(date, '%d-%b-%y').date()
+    count += 1
+prodromal_info['INFODT'] = prodromal_info['INFODT'].astype(str)
+prodromal_info['INFODT'] = prodromal_info['INFODT'].str.replace('-','') # Reformat date 
+
+
+# Merge prodromal_info dates with prodromal_df 
+prodromal_info.rename(columns = {'FullFilename' : 'subjNames'}, inplace = True )
+prodromal_info = prodromal_info[['subjNames', 'INFODT']]
+prodromal_datiq = pd.merge(prodromal_datiq, prodromal_info, how = 'outer', on = 'subjNames')
+
+prodromal_datiq['PATNO'] = ''
+#prodromal_datiq['Date'] = ''
+for row_num in range(len(prodromal_datiq['subjNames'])) :
+    subid = prodromal_datiq['subjNames'].iloc[row_num].split('_')[2]
+    prodromal_datiq['PATNO'].iloc[row_num] = subid
+prodromal_datiq.drop('subjNames', axis = 1, inplace = True)  
+
+
+## Add Enroll.Diagnosis col 
+#FIXME not sure if this should be enroll diagnosis/consensus diagnosis /what to put for subtypes
+prodromal_datiq['Enroll.Diagnosis'] = 'Prodromal'
+hc_datiq['Enroll.Diagnosis'] = 'Healthy Control'
+pd_datiq['Enroll.Diagnosis'] = 'Parkinson\'s Disease'
+prodromal_datiq['Enroll.Subtype'] = ''
+pd_datiq['Enroll.Subtype'] = ''
+hc_datiq['Enroll.Subtype'] = 'Healthy Control'
+
+# Reindex dfs 
+prodromal_datiq = prodromal_datiq.reindex(columns = ['PATNO', 'INFODT','Enroll.Diagnosis', 'Enroll.Subtype', 'DATLoad(%)',  'DATLoadLeft(%)',  'DATLoadRight(%)'])
+hc_datiq = hc_datiq.reindex(columns = ['PATNO', 'INFODT','Enroll.Diagnosis', 'Enroll.Subtype', 'DATLoad(%)',  'DATLoadLeft(%)',  'DATLoadRight(%)'])
+pd_datiq = pd_datiq.reindex(columns = ['PATNO', 'INFODT','Enroll.Diagnosis', 'Enroll.Subtype', 'DATLoad(%)',  'DATLoadLeft(%)',  'DATLoadRight(%)'])
+
+all_dfs = [prodromal_datiq, hc_datiq, pd_datiq] 
+dfs = pd.concat(all_dfs).reset_index(drop=True) # concat pd, prodromal and hc datiq df to one df 
+dfs['INFODT'] = dfs['INFODT'].str[4:6] + '/' + dfs['INFODT'].str[0:4] # Reformat date  to month/year 
+dfs['PATNO'] = dfs['PATNO'].astype(int)
+
+
+## merge with ppmi_merge
+ppmi_merge = pd.merge(ppmi_merge, dfs, how = 'outer', on = ['PATNO', 'INFODT','Enroll.Diagnosis','Enroll.Subtype'])
+ppmi_merge.fillna('NA', inplace = True)
+## TEMP END 
+
+
+
 
 ## MRI.csv
 mri_df = pd.read_csv(ppmi_download_path + 'Magnetic_Resonance_Imaging__MRI_.csv', skipinitialspace=True)
