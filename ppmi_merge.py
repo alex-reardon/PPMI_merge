@@ -10,7 +10,7 @@ ppmi_download_path = userdir + 'PPMI_Study_Data_Download/'
 invicro_data_path = userdir
 genetics_path = userdir + 'genetic_data/'
 datiq_path = userdir + 'datiq/'
-version = '0.0.5' 
+version = '0.0.4' 
 
 
 def create_cohort_df(xlsx, sheet) :
