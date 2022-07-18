@@ -646,7 +646,6 @@ prodromal_info = prodromal_info[['subjNames', 'INFODT']]
 prodromal_datiq = pd.merge(prodromal_datiq, prodromal_info, how = 'outer', on = 'subjNames')
 
 prodromal_datiq['PATNO'] = ''
-#prodromal_datiq['Date'] = ''
 for row_num in range(len(prodromal_datiq['subjNames'])) :
     subid = prodromal_datiq['subjNames'].iloc[row_num].split('_')[2]
     prodromal_datiq['PATNO'].iloc[row_num] = subid
@@ -658,14 +657,15 @@ prodromal_datiq.drop('subjNames', axis = 1, inplace = True)
 prodromal_datiq['Enroll.Diagnosis'] = 'Prodromal'
 hc_datiq['Enroll.Diagnosis'] = 'Healthy Control'
 pd_datiq['Enroll.Diagnosis'] = 'Parkinson\'s Disease'
-prodromal_datiq['Enroll.Subtype'] = ''
-pd_datiq['Enroll.Subtype'] = ''
-hc_datiq['Enroll.Subtype'] = 'Healthy Control'
 
 # Reindex dfs 
-prodromal_datiq = prodromal_datiq.reindex(columns = ['PATNO', 'INFODT','Enroll.Diagnosis', 'Enroll.Subtype', 'DATLoad(%)',  'DATLoadLeft(%)',  'DATLoadRight(%)'])
-hc_datiq = hc_datiq.reindex(columns = ['PATNO', 'INFODT','Enroll.Diagnosis', 'Enroll.Subtype', 'DATLoad(%)',  'DATLoadLeft(%)',  'DATLoadRight(%)'])
-pd_datiq = pd_datiq.reindex(columns = ['PATNO', 'INFODT','Enroll.Diagnosis', 'Enroll.Subtype', 'DATLoad(%)',  'DATLoadLeft(%)',  'DATLoadRight(%)'])
+prodromal_datiq.rename(columns = {'DATLoad(%)' :'DATLoad.Percent', 'DATLoadLeft(%)':'DATLoadLeft.Percent' , 'DATLoadRight(%)':'DATLoadRight.Percent'}, inplace = True)
+hc_datiq.rename(columns = {'DATLoad(%)' :'DATLoad.Percent', 'DATLoadLeft(%)':'DATLoadLeft.Percent' , 'DATLoadRight(%)':'DATLoadRight.Percent'}, inplace = True)
+pd_datiq.rename(columns = {'DATLoad(%)' :'DATLoad.Percent', 'DATLoadLeft(%)':'DATLoadLeft.Percent' , 'DATLoadRight(%)':'DATLoadRight.Percent'}, inplace = True)
+
+prodromal_datiq = prodromal_datiq.reindex(columns = ['PATNO', 'INFODT','Enroll.Diagnosis',  'DATLoad.Percent',  'DATLoadLeft.Percent',  'DATLoadRight.Percent'])
+hc_datiq = hc_datiq.reindex(columns = ['PATNO', 'INFODT','Enroll.Diagnosis', 'DATLoad.Percent',  'DATLoadLeft.Percent',  'DATLoadRight.Percent'])
+pd_datiq = pd_datiq.reindex(columns = ['PATNO', 'INFODT','Enroll.Diagnosis', 'DATLoad.Percent',  'DATLoadLeft.Percent',  'DATLoadRight.Percent'])
 
 all_dfs = [prodromal_datiq, hc_datiq, pd_datiq] 
 dfs = pd.concat(all_dfs).reset_index(drop=True) # concat pd, prodromal and hc datiq df to one df 
@@ -674,10 +674,10 @@ dfs['PATNO'] = dfs['PATNO'].astype(int)
 
 
 ## merge with ppmi_merge
-ppmi_merge = pd.merge(ppmi_merge, dfs, how = 'outer', on = ['PATNO', 'INFODT','Enroll.Diagnosis','Enroll.Subtype'])
+ppmi_merge = pd.merge(ppmi_merge, dfs, how = 'outer', on = ['PATNO', 'INFODT','Enroll.Diagnosis'])
 ppmi_merge.fillna('NA', inplace = True)
 ## TEMP END 
-
+ppmi_merge.to_csv('/Users/areardon/Desktop/ppmi_merge_temp.csv')
 
 
 
