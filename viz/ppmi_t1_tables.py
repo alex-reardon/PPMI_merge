@@ -205,6 +205,5 @@ df=pd.DataFrame(data)
 
 print(df)
 df.to_csv('/Users/areardon/Desktop/df' + subtype_col + '_' + event_id + '.csv')
-janet
 
 
