@@ -7,7 +7,6 @@ ppmi_merge = pd.read_csv('/Users/areardon/Desktop/ppmi_merge/ppmi_merge_v0.0.4.c
 
 cortico_spinal_df = ppmi_merge[['Subject.ID' ,'Event.ID', 'mean_fa-corticospinal_tract-left-jhu_icbm_labels_1mm']] # Get condensed version of df of only cols we want 
 print(cortico_spinal_df)
-janet
 
 cortico_spinal_df['Event.ID'].fillna('NA', inplace = True) # fill Na
 cortico_spinal_df = cortico_spinal_df[cortico_spinal_df['mean_fa-corticospinal_tract-left-jhu_icbm_labels_1mm'].notna()] # Remove all rows where there is no mean_fa_cortico... value
