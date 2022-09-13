@@ -75,6 +75,96 @@ def condensed_df(df, keep_col_list, rename_col_dict, drop_col_list) :
     return new_df
 
 
+def fill_subtype(df) : 
+    if df['Cohort'][0] == 'Parkinson\'s Disease' :  
+        # Decode Enrollment.Subtype ('Summary' sheet) and Consensus.Subtype ('Summary Analytic' sheet) of 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
+        df.loc[(df['ENRLPD'] == 1) & (df['ENRLLRRK2'] == 0) & (df['ENRLGBA'] == 0) & (df['ENRLSNCA'] == 0), 'Enrollment.Subtype'] = '' # Sporadic - don't need to define here bc already covered in 'Subgroup' column in PD sheet
+        df.loc[(df['ENRLPD' ]== 1) & (df['ENRLLRRK2'] == 1), 'Enrollment.Subtype'] =  ' : LRRK2'
+        df.loc[(df['ENRLPD'] == 1) & (df['ENRLGBA'] == 1), 'Enrollment.Subtype'] = ' : GBA'
+        df.loc[(df['ENRLPD'] == 1) & (df['ENRLSNCA'] == 1), 'Enrollment.Subtype'] =  ' : SNCA'
+        df.loc[(df['CONPD'] == 1) & (df['CONLRRK2'] == 0) | (df['CONLRRK2'] == '.') & (df['CONGBA'] == 0) | (df['CONGBA'] == '.') & (df['CONSNCA'] == 0) | (df['CONSNCA'] == '.') , 'Consensus.Subtype'] = 'Sporadic'
+        df.loc[(df['CONPD'] == 1) & (df['CONLRRK2']== 1) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2'
+        df.loc[(df['CONPD'] == 1) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 1) & (df['CONSNCA'] == 0) , 'Consensus.Subtype'] = 'Genetic : GBA'
+        df.loc[(df['CONPD'] == 1) & (df['CONLRRK2'] == 1) & (df['CONGBA'] == 1) & (df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2 + GBA'
+        df.loc[(df['CONPD'] == 1) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 1) , 'Consensus.Subtype'] = 'Genetic : SNCA'
+        df.loc[(df['CONPD'] == 0) & (df['CONPROD']== 0) , 'Consensus.Subtype'] = 'non-PD' # FIXME
+        df.loc[(df['CONPD'] == 0) & (df['CONPROD']== 1) & (df['CONLRRK2'] == 1) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2 Prodromal'
+        df.loc[(df['CONPD'] == 0) & (df['CONPROD'] == 1) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 1) & (df['CONSNCA'] == 0) , 'Consensus.Subtype'] = 'Genetic : GBA Prodromal'
+    
+    elif df['Cohort'][0] == 'Prodromal' :   
+        # Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables for prodromal df
+        df.loc[(df['ENRLPROD'] == 1) & (df['ENRLLRRK2'] == 1), 'Enrollment.Subtype'] = ' : LRRK2 Prodromal'
+        df.loc[(df['ENRLPROD'] == 1) & (df['ENRLGBA'] == 1), 'Enrollment.Subtype'] =  ' : GBA Prodromal'
+        df.loc[(df['ENRLPROD'] == 1) & (df['ENRLSNCA'] == 1), 'Enrollment.Subtype'] = ' : SNCA Prodromal'
+        df.loc[(df['ENRLPROD'] == 1) & (df['ENRLHPSM'] == 1) ,'Enrollment.Subtype'] = '' # Hyposmia already covered in 'Subgroup' column
+        df.loc[(df['ENRLPROD'] == 1) & (df['ENRLRBD'] == 1), 'Enrollment.Subtype'] = '' # RBD already covered in 'Subgroup' column
+        df.loc[(df['CONPROD'] == 1) & (df['PHENOCNV'] == 0) & (df['CONLRRK2'] == 1) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 0) ,'Consensus.Subtype'] = 'Genetic : LRRK2 Prodromal'
+        df.loc[(df['CONPROD'] == 1) & (df['PHENOCNV'] == 1) & (df['CONLRRK2'] == 1) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2 Phenoconverted'
+        df.loc[(df['CONPROD'] == 0) & (df['CONLRRK2'] == 1) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 0), 'Consensus.Subtype' ] = 'Genetic : LRRK2 not Prodromal'
+        df.loc[(df['CONPROD'] == 1) & (df['PHENOCNV'] == 0) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 1) & (df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : GBA Prodromal'
+        df.loc[(df['CONPROD'] == 1) & (df['PHENOCNV'] == 1) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 1) & (df['CONSNCA'] == 0) & (df['CONRBD'] == 0), 'Consensus.Subtype'] = 'Genetic : GBA Phenoconverted'
+        df.loc[(df['CONPROD'] == 0) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 1) & (df['CONSNCA'] == 0) , 'Consensus.Subtype' ] = 'Genetic : GBA not Prodromal'
+        df.loc[(df['CONPROD'] == 1) & (df['PHENOCNV'] == 0) & (df['CONLRRK2'] == 1) & (df['CONGBA'] == 1) & (df['CONSNCA'] == 0) , 'Consensus.Subtype'] = 'Genetic : LRRK2 + GBA Prodromal'
+        df.loc[(df['CONPROD'] == 1) & (df['PHENOCNV'] == 1) & (df['CONLRRK2'] == 1) & (df['CONGBA'] == 1) & (df['CONSNCA'] == 0) ,'Consensus.Subtype'] = 'Genetic : LRRK2 + GBA Phenoconverted'
+        df.loc[(df['CONPROD'] == 0) & (df['CONLRRK2'] == 1) & (df['CONGBA'] == 1) & (df['CONSNCA'] == 0) , 'Consensus.Subtype' ] = 'Genetic : LRRK2 + GBA not Prodromal'
+        df.loc[(df['CONPROD'] == 1) & (df['PHENOCNV'] == 0) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 1), 'Consensus.Subtype'] = 'Genetic : SNCA Prodromal'
+        df.loc[(df['CONPROD'] == 1) & (df['PHENOCNV'] == 1) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 1), 'Consensus.Subtype'] = 'Genetic : SNCA Phenoconverted'
+        df.loc[(df['CONPROD'] == 0) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 1) , 'Consensus.Subtype' ] = 'Genetic : SNCA not Prodromal'
+        df.loc[(df['CONPROD'] == 0) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 0) & (df['CONHPSM'] == 0) & (df['CONRBD'] == '.'), 'Consensus.Subtype' ] = 'No Mutation not Prodromal'
+        df.loc[(df['CONPROD'] == 1) & (df['PHENOCNV'] == 0) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 0) & (df['CONHPSM'] == 1) & (df['CONRBD'] == '.'), 'Consensus.Subtype'] = 'Hyposmia'
+        df.loc[(df['CONPROD'] == 1) & (df['PHENOCNV'] == 1) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 0) & (df['CONHPSM'] == 1) & (df['CONRBD'] == '.'), 'Consensus.Subtype' ] = 'Hyposmia : Phenoconverted'
+        df.loc[(df['CONPROD'] == 0) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 0) & (df['CONHPSM'] == 1) & (df['CONRBD'] == '.'), 'Consensus.Subtype' ] =  'Hyposmia : not Prodromal'
+        df.loc[(df['CONPROD'] == 1) & (df['CONRBD'] == 1) & (df['PHENOCNV'] == 0) , 'Consensus.Subtype'] = 'RBD'
+        df.loc[(df['CONPROD'] == 1) & (df['CONRBD'] == 1) & (df['PHENOCNV'] == 1) & (df['CONGBA'] == 0), 'Consensus.Subtype'] = 'RBD : Phenoconverted'
+        df.loc[(df['CONPROD'] == 1) & (df['CONRBD'] == 1) & (df['PHENOCNV'] == 1) & (df['CONGBA'] == 1), 'Consensus.Subtype' ] = 'RBD : Phenoconverted with GBA'
+
+    elif df['Cohort'][0] == 'Healthy Control' :  
+        # Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables for Healthy Control df
+        df.loc[(df['ENRLHC'] == 1), 'Enrollment.Subtype'] = '' # Healthy Control already covered in Subgroup column
+        df.loc[(df['CONHC'] == 1) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Healthy Control'
+        df.loc[(df['CONHC'] == 1) & (df['CONLRRK2'] == 1) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 0),'Consensus.Subtype'] = 'LRRK2'
+        df.loc[(df['CONHC'] == 1) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 1) & (df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'GBA'
+        df.loc[(df['CONHC'] == 1) & (df['CONLRRK2'] == 1) & (df['CONGBA'] == 1) & (df['CONSNCA'] == 0) ,'Consensus.Subtype'] = 'LRRK + GBA'
+        df.loc[(df['CONHC'] == 1) & (df['CONLRRK2'] == 0) & (df['CONGBA'] == 0) & (df['CONSNCA'] == 1), 'Consensus.Subtype'] = 'SNCA'
+        df.loc[(df['CONHC'] == 0), 'Consensus.Subtype'] = 'non-HC'  # FIXME
+
+    elif df['Cohort'][0] == 'SWEDD' :  
+        # Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables for swedd df
+        df.loc[df['ENRLSWEDD'] == 1 , 'Enrollment.Subtype'] =  'SWEDD Legacy'
+        df.loc[df['CONSWEDD'] == 0 , 'Consensus.Subtype'] = 'SWEDD/PD Active'
+        df.loc[df['CONSWEDD'] == 1 ,'Consensus.Subtype'] =  'SWEDD/non-PD Active'
+    return df 
+
+
+def decode_CON(df) : 
+    df['CONPD'].replace({1 : 'Parkinson\'s Disease', 0 : ''}, inplace = True)
+    df['CONPROD'].replace({1 : 'Prodromal',  0 : ''}, inplace = True)
+    df['CONHC'].replace({1 : 'Healthy Control',  0 : ''}, inplace = True)
+    df['CONSWEDD'].replace({1 : 'SWEDD',  0 : 'SWEDD/PD'}, inplace = True)
+    df['Comments'].replace({'MSA' : 'Multiple System Atrophy'}, inplace = True)
+    return df 
+
+
+
+def remove_cols_that_startwith(df, list) : 
+    df = df.loc[:, ~df.columns.str.startswith(tuple(list))] # Remove columns that begin with CON and ENRL
+    return df 
+
+
+
+def add_PD_Disease_Duration(df, col_name)  :
+    df[col_name] = '' # Initialize PD.Diagnosis.Duration variable
+    for row_num in range(len(df['PD.Diagnosis.Date'])) :
+        if isinstance(df['PD.Diagnosis.Date'].loc[row_num], str) and isinstance(df['INFODT'].loc[row_num], str): # If we have both a PD Diagnosis date and an event id date
+            diag_year = int(df['PD.Diagnosis.Date'].loc[row_num].split('/')[1]) # Diagnosis year
+            diag_month = int(df['PD.Diagnosis.Date'].loc[row_num].split('/')[0]) # Diagnosis month
+            event_year = int(df['INFODT'].loc[row_num].split('/')[1]) # Visit date year
+            event_month = int(df['INFODT'].loc[row_num].split('/')[0]) # Visit date month
+            diff = relativedelta.relativedelta(datetime(event_year, event_month, 1), datetime(diag_year, diag_month, 1)) # FIXME ASSUMPTION visit date and diagnosis date was the first of the month
+            df[col_name].iloc[row_num] = ((diff.years)*12 + diff.months)/12 # PD.Diagnosis.Duration in years
+    return df
+
+    
 #### CLINICAL INFO ####
 # Create cohort df
 xlsx = pd.ExcelFile(ppmi_download_path + 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx') # Read in main xlsx file
@@ -83,73 +173,19 @@ prodromal_df = create_cohort_df(xlsx, 'Prodromal')# Create Prodromal data frame 
 hc_df = create_cohort_df(xlsx, 'HC')# Create HC data frame from 'PD' sheet in 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
 swedd_df = create_cohort_df(xlsx, 'SWEDD') # Create SWEDD data frame from 'PD' sheet in 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
 
-# Decode Enrollment.Subtype ('Summary' sheet) and Consensus.Subtype ('Summary Analytic' sheet) of 'Consensus_Committee_Analytic_Datasets_28OCT21.xlsx'
-pd_df.loc[(pd_df['ENRLPD'] == 1) & (pd_df['ENRLLRRK2'] == 0) & (pd_df['ENRLGBA'] == 0) & (pd_df['ENRLSNCA'] == 0), 'Enrollment.Subtype'] = '' # Sporadic - don't need to define here bc already covered in 'Subgroup' column in PD sheet
-pd_df.loc[(pd_df['ENRLPD' ]== 1) & (pd_df['ENRLLRRK2'] == 1), 'Enrollment.Subtype'] =  ' : LRRK2'
-pd_df.loc[(pd_df['ENRLPD'] == 1) & (pd_df['ENRLGBA'] == 1), 'Enrollment.Subtype'] = ' : GBA'
-pd_df.loc[(pd_df['ENRLPD'] == 1) & (pd_df['ENRLSNCA'] == 1), 'Enrollment.Subtype'] =  ' : SNCA'
-pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2'] == 0) | (pd_df['CONLRRK2'] == '.') & (pd_df['CONGBA'] == 0) | (pd_df['CONGBA'] == '.') & (pd_df['CONSNCA'] == 0) | (pd_df['CONSNCA'] == '.') , 'Consensus.Subtype'] = 'Sporadic'
-pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2']== 1) & (pd_df['CONGBA'] == 0) & (pd_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2'
-pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2'] == 0) & (pd_df['CONGBA'] == 1) & (pd_df['CONSNCA'] == 0) , 'Consensus.Subtype'] = 'Genetic : GBA'
-pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2'] == 1) & (pd_df['CONGBA'] == 1) & (pd_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2 + GBA'
-pd_df.loc[(pd_df['CONPD'] == 1) & (pd_df['CONLRRK2'] == 0) & (pd_df['CONGBA'] == 0) & (pd_df['CONSNCA'] == 1) , 'Consensus.Subtype'] = 'Genetic : SNCA'
-pd_df.loc[(pd_df['CONPD'] == 0) & (pd_df['CONPROD']== 0) , 'Consensus.Subtype'] = 'non-PD' # FIXME
-pd_df.loc[(pd_df['CONPD'] == 0) & (pd_df['CONPROD']== 1) & (pd_df['CONLRRK2'] == 1) & (pd_df['CONGBA'] == 0) & (pd_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2 Prodromal'
-pd_df.loc[(pd_df['CONPD'] == 0) & (pd_df['CONPROD'] == 1) & (pd_df['CONLRRK2'] == 0) & (pd_df['CONGBA'] == 1) & (pd_df['CONSNCA'] == 0) , 'Consensus.Subtype'] = 'Genetic : GBA Prodromal'
-
-# Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables for prodromal df
-prodromal_df.loc[(prodromal_df['ENRLPROD'] == 1) & (prodromal_df['ENRLLRRK2'] == 1), 'Enrollment.Subtype'] = ' : LRRK2 Prodromal'
-prodromal_df.loc[(prodromal_df['ENRLPROD'] == 1) & (prodromal_df['ENRLGBA'] == 1), 'Enrollment.Subtype'] =  ' : GBA Prodromal'
-prodromal_df.loc[(prodromal_df['ENRLPROD'] == 1) & (prodromal_df['ENRLSNCA'] == 1), 'Enrollment.Subtype'] = ' : SNCA Prodromal'
-prodromal_df.loc[(prodromal_df['ENRLPROD'] == 1) & (prodromal_df['ENRLHPSM'] == 1) ,'Enrollment.Subtype'] = '' # Hyposmia already covered in 'Subgroup' column
-prodromal_df.loc[(prodromal_df['ENRLPROD'] == 1) & (prodromal_df['ENRLRBD'] == 1), 'Enrollment.Subtype'] = '' # RBD already covered in 'Subgroup' column
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 0) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0) ,'Consensus.Subtype'] = 'Genetic : LRRK2 Prodromal'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : LRRK2 Phenoconverted'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0), 'Consensus.Subtype' ] = 'Genetic : LRRK2 not Prodromal'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Genetic : GBA Prodromal'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0) & (prodromal_df['CONRBD'] == 0), 'Consensus.Subtype'] = 'Genetic : GBA Phenoconverted'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0) , 'Consensus.Subtype' ] = 'Genetic : GBA not Prodromal'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 0) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0) , 'Consensus.Subtype'] = 'Genetic : LRRK2 + GBA Prodromal'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0) ,'Consensus.Subtype'] = 'Genetic : LRRK2 + GBA Phenoconverted'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 1) & (prodromal_df['CONGBA'] == 1) & (prodromal_df['CONSNCA'] == 0) , 'Consensus.Subtype' ] = 'Genetic : LRRK2 + GBA not Prodromal'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 1), 'Consensus.Subtype'] = 'Genetic : SNCA Prodromal'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 1), 'Consensus.Subtype'] = 'Genetic : SNCA Phenoconverted'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 1) , 'Consensus.Subtype' ] = 'Genetic : SNCA not Prodromal'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0) & (prodromal_df['CONHPSM'] == 0) & (prodromal_df['CONRBD'] == '.'), 'Consensus.Subtype' ] = 'No Mutation not Prodromal'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0) & (prodromal_df['CONHPSM'] == 1) & (prodromal_df['CONRBD'] == '.'), 'Consensus.Subtype'] = 'Hyposmia'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0) & (prodromal_df['CONHPSM'] == 1) & (prodromal_df['CONRBD'] == '.'), 'Consensus.Subtype' ] = 'Hyposmia : Phenoconverted'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 0) & (prodromal_df['CONLRRK2'] == 0) & (prodromal_df['CONGBA'] == 0) & (prodromal_df['CONSNCA'] == 0) & (prodromal_df['CONHPSM'] == 1) & (prodromal_df['CONRBD'] == '.'), 'Consensus.Subtype' ] =  'Hyposmia : not Prodromal'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['CONRBD'] == 1) & (prodromal_df['PHENOCNV'] == 0) , 'Consensus.Subtype'] = 'RBD'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['CONRBD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONGBA'] == 0), 'Consensus.Subtype'] = 'RBD : Phenoconverted'
-prodromal_df.loc[(prodromal_df['CONPROD'] == 1) & (prodromal_df['CONRBD'] == 1) & (prodromal_df['PHENOCNV'] == 1) & (prodromal_df['CONGBA'] == 1), 'Consensus.Subtype' ] = 'RBD : Phenoconverted with GBA'
-
-# Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables for Healthy Control df
-hc_df.loc[(hc_df['ENRLHC'] == 1), 'Enrollment.Subtype'] = '' # Healthy Control already covered in Subgroup column
-hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 0) & (hc_df['CONGBA'] == 0) & (hc_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'Healthy Control'
-hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 1) & (hc_df['CONGBA'] == 0) & (hc_df['CONSNCA'] == 0),'Consensus.Subtype'] = 'LRRK2'
-hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 0) & (hc_df['CONGBA'] == 1) & (hc_df['CONSNCA'] == 0), 'Consensus.Subtype'] = 'GBA'
-hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 1) & (hc_df['CONGBA'] == 1) & (hc_df['CONSNCA'] == 0) ,'Consensus.Subtype'] = 'LRRK + GBA'
-hc_df.loc[(hc_df['CONHC'] == 1) & (hc_df['CONLRRK2'] == 0) & (hc_df['CONGBA'] == 0) & (hc_df['CONSNCA'] == 1), 'Consensus.Subtype'] = 'SNCA'
-hc_df.loc[(hc_df['CONHC'] == 0), 'Consensus.Subtype'] = 'non-HC'  # FIXME
-
-# Decode Enrollment.Subtype and Consensus.Subtype to be categorical variables for swedd df
-swedd_df.loc[swedd_df['ENRLSWEDD'] == 1 , 'Enrollment.Subtype'] =  'SWEDD Legacy'
-swedd_df.loc[swedd_df['CONSWEDD'] == 0 , 'Consensus.Subtype'] = 'SWEDD/PD Active'
-swedd_df.loc[swedd_df['CONSWEDD'] == 1 ,'Consensus.Subtype'] =  'SWEDD/non-PD Active'
+pd_df = fill_subtype(pd_df)
+prodromal_df = fill_subtype(prodromal_df)
+hc_df = fill_subtype(hc_df)
+swedd_df = fill_subtype(swedd_df)
 
 # Merge the four cohort dataframes (HC, Prodromal, PD, SWEDD)
 full_df = pd_df.append([prodromal_df, hc_df, swedd_df]) # Concat all 4 cohort dfs
-
-# Decode and re-organize full_df
-full_df['CONPD'].replace({1 : 'Parkinson\'s Disease', 0 : ''}, inplace = True)
-full_df['CONPROD'].replace({1 : 'Prodromal',  0 : ''}, inplace = True)
-full_df['CONHC'].replace({1 : 'Healthy Control',  0 : ''}, inplace = True)
-full_df['CONSWEDD'].replace({1 : 'SWEDD',  0 : 'SWEDD/PD'}, inplace = True)
-full_df['Comments'].replace({'MSA' : 'Multiple System Atrophy'}, inplace = True)
+full_df = decode_CON(full_df)
 full_df = decode_0_1_no_yes(full_df, ['PHENOCNV'])
 full_df = merge_columns(full_df, ['CONPD', 'CONPROD', 'CONHC', 'CONSWEDD','Comments'], 'Consensus.Diagnosis', ': ') # Get one column for Consensus Diagnosis with comments merged in
 full_df = merge_columns(full_df, ['Subgroup', 'Enrollment.Subtype'], 'Enroll.Subtype', '') # Get one column for Enroll.Subtype
-full_df = full_df.loc[:, ~full_df.columns.str.startswith(tuple(['CON','ENRL']))] # Remove columns that begin with CON and ENRL
+full_df = remove_cols_that_startwith(full_df, ['CON','ENRL']) 
+
 full_df.rename(columns = {'Cohort' : 'Enroll.Diagnosis' , 'PHENOCNV' : 'Subject.Phenoconverted'}, inplace = True)
 full_df = full_df[['PATNO', 'Enroll.Diagnosis', 'Enroll.Subtype', 'Consensus.Diagnosis', 'Consensus.Subtype','Subject.Phenoconverted','DIAG1','DIAG1VIS', 'DIAG2','DIAG2VIS']] # Reorganize column order
 analytic_cohort_subids = full_df['PATNO'].unique() # subids for analytic cohort
@@ -165,17 +201,7 @@ ppmi_merge = merge_new_csv(ppmi_merge,  'PD_Diagnosis_History.csv', ['PATNO', 'E
 ppmi_merge['SEX'].replace({0 : 'Female', 1 : 'Male' }, inplace = True) # Decode sex
 ppmi_merge['HANDED'].replace({1 : 'Right', 2 : 'Left', 3 : 'Mixed' }, inplace = True) # Decode handedness
 ppmi_merge.rename(columns = {'AGE_AT_VISIT' : 'Age', 'SEX' : 'Sex', 'HANDED' : 'Handed', 'BIRTHDT' : 'BirthDate', 'WGTKG' : 'Weight(kg)', 'HTCM' : 'Height(cm)', 'SXDT' : 'First.Symptom.Date', 'PDDXDT': 'PD.Diagnosis.Date', 'AFICBERB' : 'African.Berber.Race','ASHKJEW':'Ashkenazi.Jewish.Race', 'BASQUE' : 'Basque.Race', 'HISPLAT' : 'Hispanic.Latino.Race', 'RAASIAN' : 'Asian.Race', 'RABLACK' : 'African.American.Race', 'RAHAWOPI' : 'Hawian.Other.Pacific.Islander.Race', 'RAINDALS' : 'Indian.Alaska.Native.Race', 'RANOS' : 'Not.Specified.Race', 'RAWHITE': 'White.Race'}, inplace = True) # Rename columns
-
-## Add a PD.Disease.Duration variable (in years)
-ppmi_merge['PD.Diagnosis.Duration'] = '' # Initialize PD.Diagnosis.Duration variable
-for row_num in range(len(ppmi_merge['PD.Diagnosis.Date'])) :
-    if isinstance(ppmi_merge['PD.Diagnosis.Date'].loc[row_num], str) and isinstance(ppmi_merge['INFODT'].loc[row_num], str): # If we have both a PD Diagnosis date and an event id date
-        diag_year = int(ppmi_merge['PD.Diagnosis.Date'].loc[row_num].split('/')[1]) # Diagnosis year
-        diag_month = int(ppmi_merge['PD.Diagnosis.Date'].loc[row_num].split('/')[0]) # Diagnosis month
-        event_year = int(ppmi_merge['INFODT'].loc[row_num].split('/')[1]) # Visit date year
-        event_month = int(ppmi_merge['INFODT'].loc[row_num].split('/')[0]) # Visit date month
-        diff = relativedelta.relativedelta(datetime(event_year, event_month, 1), datetime(diag_year, diag_month, 1)) # FIXME ASSUMPTION visit date and diagnosis date was the first of the month
-        ppmi_merge['PD.Diagnosis.Duration'].iloc[row_num] = ((diff.years)*12 + diff.months)/12 # PD.Diagnosis.Duration in years
+ppmi_merge = add_PD_Disease_Duration(ppmi_merge, 'PD.Diagnosis.Duration')
 
 # Add Final (FNL) Event ID and info
 ppmi_merge = merge_new_csv(ppmi_merge, 'Conclusion_of_Study_Participation.csv', ['PATNO', 'EVENT_ID', 'COMPLT', 'WDRSN', 'WDDT'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # completed study, whithdrawal reason, withdrawal date
@@ -216,6 +242,13 @@ ppmi_merge['Cognitive.Page.Name'].replace({'COGCATG' : 'Cognitive Categorization
 ## Cognitive symptoms - MOCA
 ppmi_merge = merge_new_csv(ppmi_merge, 'Montreal_Cognitive_Assessment__MoCA_.csv',['PATNO', 'EVENT_ID', 'MCATOT'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
 ppmi_merge.rename(columns = {'MCATOT' : 'MOCA.Total'}, inplace = True) # Rename
+
+
+
+
+
+
+
 
 ## Medication status - OLD WAY START 
 ## Medication Status - Concomitant Med Log # FIXME not a useful way to show medication status 
@@ -1262,3 +1295,6 @@ ppmi_merge.fillna('NA', inplace = True)
 cols_delete = ['Unnamed'] # Columns to remove from sheet/df
 ppmi_merge = ppmi_merge.loc[:, ~ppmi_merge.columns.str.startswith(tuple(cols_delete))] # Remove columns in cols_delete
 ppmi_merge.to_csv(userdir + 'ppmi_merge_v' + version + '.csv')
+
+
+
