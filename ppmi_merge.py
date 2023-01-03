@@ -8,12 +8,12 @@ import re
 from typing import List
 
 
-userdir = '/Users/areardon/Desktop/ppmi_merge/'
+userdir = '/Users/areardon/Desktop/Projects/PPMI_Merge/'
 ppmi_download_path = userdir + 'PPMI_Study_Data_Download/'
 invicro_data_path = userdir
 genetics_path = userdir + 'genetic_data/'
 datiq_path = userdir + 'datiq/'
-version = '0.0.6' 
+version = '0.0.7' 
 
 
 def read_csv_drop_cols(filepath, csv_filename : str, list_cols : List, drop : bool) : 
@@ -129,10 +129,10 @@ def merge_dti_results(ppmi_merge, bucket, prefix, search_string, merge_on) :
     client = boto3.client('s3', region_name="us-east-1")
     appended_data = []
     for key in dti : 
-        subid = np.int64(key.split('/')[2])
-        date = key.split('/') [3]
+        subid = np.int64(key.split('/')[4])
+        date = key.split('/') [5]
         month_date = date[4:6] + '/' + date[0:4] 
-        image_id = key.split('/')[5]
+        image_id = key.split('/')[7]
         csv_obj = client.get_object(Bucket=bucket, Key = key)
         body = csv_obj['Body']
         csv_string = body.read().decode('utf-8')
@@ -1027,12 +1027,19 @@ ppmi_merge['EVENT_ID'].fillna('SC', inplace = True) # One subject (41358) has ev
 
 
 ## Add demographics, vital signs, and pd diagnosis history info, final event id and diagnosi change, dominant side of disease 
-ppmi_merge = merge_csv(ppmi_download_path, ppmi_merge, 'Demographics.csv', ['PATNO','EVENT_ID','SEX', 'HANDED', 'BIRTHDT','AFICBERB','ASHKJEW','BASQUE','HISPLAT','RAASIAN','RABLACK','RAHAWOPI','RAINDALS','RANOS','RAWHITE'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # Bday, sex, handedness, race
-ppmi_merge = merge_csv(ppmi_download_path, ppmi_merge, 'Vital_Signs.csv', ['PATNO','EVENT_ID','INFODT', 'WGTKG', 'HTCM'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # Visit date, weight and height
+ppmi_merge = merge_csv(ppmi_download_path, ppmi_merge, 'Demographics.csv', ['PATNO','EVENT_ID','SEX', 'HANDED', 'BIRTHDT','AFICBERB','ASHKJEW','BASQUE', 'HISPLAT', 'RAASIAN', 'RABLACK', 'RAHAWOPI', 'RAINDALS', 'RANOS', 'RAWHITE'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # Bday, sex, handedness, race
+ppmi_merge = merge_csv(ppmi_download_path, ppmi_merge, 'Vital_Signs.csv', ['PATNO','EVENT_ID','INFODT', 'WGTKG', 'HTCM', 'SYSSUP', 'DIASUP', 'SYSSTND', 'DIASTND'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # Visit date, weight and height
 ppmi_merge = merge_csv(ppmi_download_path, ppmi_merge,  'PD_Diagnosis_History.csv', ['PATNO', 'EVENT_ID', 'SXDT','PDDXDT'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # First symptom date, PD diagnosis date
+
+
+
+ppmi_merge = merge_csv(ppmi_download_path, ppmi_merge, 'SCOPA-AUT.csv', ['PATNO', 'EVENT_ID', 'SCAU8', 'SCAU9', 'SCAU15', 'SCAU16'] , merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
+ppmi_merge = merge_csv(ppmi_download_path, ppmi_merge, 'Modified_Schwab___England_Activities_of_Daily_Living.csv', ['PATNO', 'EVENT_ID','MSEADLG'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
+
+
 ppmi_merge['SEX'].replace({0 : 'Female', 1 : 'Male' }, inplace = True) # Decode sex
 ppmi_merge['HANDED'].replace({1 : 'Right', 2 : 'Left', 3 : 'Mixed' }, inplace = True) # Decode handedness
-ppmi_merge.rename(columns = {'AGE_AT_VISIT' : 'Age', 'SEX' : 'Sex', 'HANDED' : 'Handed', 'BIRTHDT' : 'BirthDate', 'WGTKG' : 'Weight(kg)', 'HTCM' : 'Height(cm)', 'SXDT' : 'First.Symptom.Date', 'PDDXDT': 'PD.Diagnosis.Date', 'AFICBERB' : 'African.Berber.Race','ASHKJEW':'Ashkenazi.Jewish.Race', 'BASQUE' : 'Basque.Race', 'HISPLAT' : 'Hispanic.Latino.Race', 'RAASIAN' : 'Asian.Race', 'RABLACK' : 'African.American.Race', 'RAHAWOPI' : 'Hawian.Other.Pacific.Islander.Race', 'RAINDALS' : 'Indian.Alaska.Native.Race', 'RANOS' : 'Not.Specified.Race', 'RAWHITE': 'White.Race'}, inplace = True) # Rename columns
+ppmi_merge.rename(columns = {'AGE_AT_VISIT' : 'Age', 'SEX' : 'Sex', 'HANDED' : 'Handed', 'BIRTHDT' : 'BirthDate', 'WGTKG' : 'Weight(kg)', 'HTCM' : 'Height(cm)','SYSSUP':'Systolic.BP.Sitting', 'DIASUP' : 'Diastolic.BP.Sitting', 'SYSSTND' : 'Systolic.BP.Standing', 'DIASTND': 'Diastolic.BP.Standing', 'SXDT' : 'First.Symptom.Date', 'PDDXDT': 'PD.Diagnosis.Date', 'AFICBERB' : 'African.Berber.Race','ASHKJEW':'Ashkenazi.Jewish.Race', 'BASQUE' : 'Basque.Race', 'HISPLAT' : 'Hispanic.Latino.Race', 'RAASIAN' : 'Asian.Race', 'RABLACK' : 'African.American.Race', 'RAHAWOPI' : 'Hawian.Other.Pacific.Islander.Race', 'RAINDALS' : 'Indian.Alaska.Native.Race', 'RANOS' : 'Not.Specified.Race', 'RAWHITE': 'White.Race'}, inplace = True) # Rename columns
 ppmi_merge = add_PD_Disease_Duration(ppmi_merge, 'PD.Diagnosis.Duration')
 ppmi_merge = merge_csv(ppmi_download_path, ppmi_merge, 'Conclusion_of_Study_Participation.csv', ['PATNO', 'EVENT_ID', 'COMPLT', 'WDRSN', 'WDDT'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer") # completed study, whithdrawal reason, withdrawal date
 ppmi_merge = decode_0_1_no_yes(ppmi_merge, ['COMPLT'])
@@ -1064,18 +1071,14 @@ ppmi_merge['Cognitive.Page.Name'].replace({'COGCATG' : 'Cognitive Categorization
 ## MOCA 
 ppmi_merge = merge_csv(ppmi_download_path, ppmi_merge, 'Montreal_Cognitive_Assessment__MoCA_.csv',['PATNO', 'EVENT_ID', 'MCATOT'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
 ppmi_merge.rename(columns = {'MCATOT' : 'MOCA.Total'}, inplace = True) # Rename
-ppmi_merge.to_csv(userdir + 'ppmi_merge_new1.csv')
 
+## Add others
 ppmi_merge = add_concomitant_med_log(ppmi_merge, ppmi_download_path)
-ppmi_merge.to_csv(userdir + 'ppmi_merge_new2.csv')
-
 ppmi_merge = add_LEDD(ppmi_merge, ppmi_download_path) 
 ppmi_merge = make_categorical_LEDD_col(ppmi_merge, 'LEDD.sum', 'LEDD.sum.Cat', 3) 
 ppmi_merge = make_categorical_LEDD_col(ppmi_merge, 'LEDD.ongoing.sum', 'LEDD.ongoing.sum.Cat',3)
-ppmi_merge.to_csv(userdir + 'ppmi_merge_new3.csv')
-
 ppmi_merge = add_comorbidities(ppmi_merge, ppmi_download_path)
-ppmi_merge.to_csv(userdir + 'ppmi_merge_new4.csv')
+
     
 ## Education 
 ppmi_merge = merge_csv(ppmi_download_path, ppmi_merge, 'Socio-Economics.csv', ['PATNO', 'EVENT_ID', 'EDUCYRS'], merge_on = ['PATNO'], merge_how = "outer") # Add education in years
@@ -1084,7 +1087,7 @@ ppmi_merge = add_analytic_cohort_col(analytic_cohort_subids, ppmi_merge) # Add a
 ppmi_merge.to_csv(userdir + 'ppmi_merge_new5.csv')
 
 ## Reindex
-ppmi_merge = ppmi_merge.reindex(columns = ['PATNO', 'EVENT_ID', 'INFODT' , 'Enroll.Diagnosis', 'Enroll.Subtype', 'Consensus.Diagnosis', 'Consensus.Subtype','Analytic.Cohort','Subject.Phenoconverted','First.Diagnosis.Change', 'Second.Diagnosis.Change',  'First.Symptom.Date', 'PD.Diagnosis.Date', 'PD.Diagnosis.Duration','BirthDate', 'Age', 'Sex', 'Handed', 'Weight(kg)',	'Height(cm)', 'Education.Years', 'DOMSIDE', 'African.Berber.Race','Ashkenazi.Jewish.Race', 'Basque.Race', 'Hispanic.Latino.Race', 'Asian.Race', 'African.American.Race', 'Hawian.Other.Pacific.Islander.Race', 'Indian.Alaska.Native.Race', 'Not.Specified.Race',  'White.Race', 'Motor.Function.Page.Name',	'Motor.Function.Source',	'Trouble.Rising.Chair',	'Writing.Smaller',	'Voice.Softer',	'Poor.Balance',	'Feet.Stuck',	'Less.Expressive',	'Arms/Legs.Shake',	'Trouble.Buttons',	'Shuffle.Feet',	'Slow.Movements',	'Been.Told.PD',	'Cognitive.Page.Name',	'Cognitive.Source', 'Cognitive.Decline',	'Functional.Cognitive.Impairment',	'Confidence.Level.Cognitive.Diagnosis',	'Cognitive.State',	'Cognitive.Tscore.Cat',	'MOCA.Total', 'Medication' ,'LEDD.sum', 'LEDD.sum.Cat', 'LEDD.ongoing.sum','LEDD.ongoing.sum.Cat','Medical.History.Description(Diagnosis.Date)'])
+ppmi_merge = ppmi_merge.reindex(columns = ['PATNO', 'EVENT_ID', 'INFODT' , 'Enroll.Diagnosis', 'Enroll.Subtype', 'Consensus.Diagnosis', 'Consensus.Subtype','Analytic.Cohort','Subject.Phenoconverted','First.Diagnosis.Change', 'Second.Diagnosis.Change',  'First.Symptom.Date', 'PD.Diagnosis.Date', 'PD.Diagnosis.Duration','BirthDate', 'Age', 'Sex', 'Handed', 'Weight(kg)',	'Height(cm)', 'Systolic.BP.Sitting', 'Diastolic.BP.Sitting',  'Systolic.BP.Standing',  'Diastolic.BP.Standing', 'SCAU8', 'SCAU9', 'SCAU15', 'SCAU16', 'MSEADLG', 'Education.Years', 'DOMSIDE', 'African.Berber.Race','Ashkenazi.Jewish.Race', 'Basque.Race', 'Hispanic.Latino.Race', 'Asian.Race', 'African.American.Race', 'Hawian.Other.Pacific.Islander.Race', 'Indian.Alaska.Native.Race', 'Not.Specified.Race',  'White.Race', 'Motor.Function.Page.Name',	'Motor.Function.Source',	'Trouble.Rising.Chair',	'Writing.Smaller',	'Voice.Softer',	'Poor.Balance',	'Feet.Stuck',	'Less.Expressive',	'Arms/Legs.Shake',	'Trouble.Buttons',	'Shuffle.Feet',	'Slow.Movements',	'Been.Told.PD',	'Cognitive.Page.Name',	'Cognitive.Source', 'Cognitive.Decline',	'Functional.Cognitive.Impairment',	'Confidence.Level.Cognitive.Diagnosis',	'Cognitive.State',	'Cognitive.Tscore.Cat',	'MOCA.Total', 'Medication' ,'LEDD.sum', 'LEDD.sum.Cat', 'LEDD.ongoing.sum','LEDD.ongoing.sum.Cat','Medical.History.Description(Diagnosis.Date)'])
 
 ## Add in other csvs
 ppmi_merge = merge_csv(ppmi_download_path, ppmi_merge, 'Modified_Boston_Naming_Test.csv', ['PATNO', 'EVENT_ID', 'MBSTNSCR', 'MBSTNCRC', 'MBSTNCRR', 'MBSTNVRS'], merge_on = ['PATNO', 'EVENT_ID'], merge_how = "outer")
@@ -1289,8 +1292,8 @@ ppmi_merge = add_t1_mergewide(ppmi_merge)
 
 
 ppmi_merge = get_full_ImageAcquisitionDate(ppmi_merge)
-ppmi_merge = merge_dti_results(ppmi_merge, 'ppmi-dti', 'antspymm/PPMI/', 'mean_fa_summary', ['Subject.ID', 'Event.ID.Date'])
-ppmi_merge = merge_dti_results(ppmi_merge, 'ppmi-dti', 'antspymm/PPMI/', 'mean_md_summary', ['Subject.ID','Event.ID.Date', 'DTI.antspymm.Image.ID'])
+ppmi_merge = merge_dti_results(ppmi_merge, 'ppmi-dti', 'processed/antspymm/antspymm_v0.3.3/PPMI/', 'mean_fa_summary', ['Subject.ID', 'Event.ID.Date'])
+ppmi_merge = merge_dti_results(ppmi_merge, 'ppmi-dti', 'processed/antspymm/antspymm_v0.3.3/PPMI/', 'mean_md_summary', ['Subject.ID','Event.ID.Date', 'DTI.antspymm.Image.ID'])
 
 
 
