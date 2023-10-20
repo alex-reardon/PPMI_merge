@@ -19,6 +19,7 @@ def main() :
     cohort_df = create_cohort(ppmi_download_path)
     ppmi_merge = merge_clinical_files(cohort_df)
     ppmi_merge = merge_updrs_files(ppmi_merge)
+    print(ppmi_merge['EVENT_ID'])
     ppmi_merge = cleanup(ppmi_merge)
     
 
@@ -91,7 +92,7 @@ def merge_updrs_files(ppmi_merge):
     updrs_cat = decode(updrs_cat, code_list, 'NUPDRS4', ['NP4WDYSK','NP4DYSKI','NP4OFF','NP4FLCTI','NP4DYSTN','NP4FLCTX'],{'NP4WDYSKDEN':'Total.Hours.with.Dyskinesias.UPDRS4', 'NP4WDYSKNUM' :'Total.Hours.Awake.Dysk.UPDRS4', 'NP4WDYSKPCT' : 'Percent.Dyskinesia.UPDRS4','NP4OFFDEN':'Total.Hours.OFF.UPDRS4', 'NP4OFFNUM' : 'Total.Hours.Awake.OFF.UPDRS4','NP4OFFPCT' : 'Percent.OFF.UPDRS4', 'NP4DYSTNDEN' :'Total.Hours.OFF.with.Dystonia.UPDRS4',    'NP4DYSTNNUM':'Total.Hours.OFF.Dyst.UPDRS4', 'NP4DYSTNPCT':'Percent.OFF.Dystonia.UPDRS4', 'NP4WDYSK' : 'Time.Spent.with.Dyskinesias.UPDRS4', 'NP4DYSKI':'Functional.Impact.of.Dyskinesias.UPDRS4','NP4OFF' : 'Time.Spent.in.OFF.State.UPDRS4',     'NP4FLCTI':'Functional.Impact.Fluctuations.UPDRS4',    'NP4FLCTX':'Complexity.of.Motor.Fluctuations.UPDRS4' ,    'NP4DYSTN':'Painful.OFF-state.Dystonia.UPDRS4' ,'NP4TOT': 'Total.UPDRS4','NP4WDYSKDEN' : 'Total.Hours.with.Dyskinesia.UPDRS4', 'NP4WDYSKNUM' : 'Total.Hours.Awake.Dysk.UPDRS4', 'NP4WDYSKPCT' : 'Percent.Dyskinesia.UPDRS4',  'NP4OFFDEN' :'Total.Hours.OFF.UPDRS4' , 'NP4OFFNUM' :'Total.Hours.Awake.OFF.UPDRS4' , 'NP4OFFPCT': 'Percent.OFF.UPDRS4', 'NP4DYSTNDEN' : 'Total.Hours.OFF.with.Dystonia.UPDRS4', 'NP4DYSTNNUM' :'Total.Hours.OFF.Dyst.UPDRS4', 'NP4DYSTNPCT' : 'Percent.OFF.Dystonia.UPDRS4' })
     updrs_cat = add_extension_to_column_names(updrs_cat, ['PATNO', 'EVENT_ID','INFODT'], '.Cat') # Add a .Num extension to column names w updrs numeric vars
 
-    # subscores
+    # Subscores
     updrs_numeric = add_subscore(updrs_numeric,  ['Rigidity.Neck.UPDRS3',  'Rigidity.RUE.UPDRS3',  'Rigidity.LUE.UPDRS3',  'Rigidity.RLE.UPDRS3',  'Rigidity.LLE.UPDRS3', 'Finger.Tapping.Right.Hand.UPDRS3' , 'Finger.Tapping.Left.Hand.UPDRS3' , 'Hand.Movements.Right.Hand.UPDRS3','Hand.Movements.Left.Hand.UPDRS3','Pronation.Supination.Right.Hand.UPDRS3', 'Pronation.Supination.Left.Hand.UPDRS3',   'Toe.Tapping.Right.Foot.UPDRS3','Toe.Tapping.Left.Foot.UPDRS3','Leg.Agility.Right.Leg.UPDRS3', 'Leg.Agility.Left.Leg.UPDRS3'], 'Brady.Rigidity.Subscore.UPDRS3')
     updrs_numeric = add_subscore(updrs_numeric, ['Tremor.UPDRS2', 'Postural.Tremor.Right.Hand.UPDRS3' ,'Postural.Tremor.Left.Hand.UPDRS3' ,'Kinetic.Tremor.Right.Hand.UPDRS3','Kinetic.Tremor.Left.Hand.UPDRS3', 'Rest.Tremor.Amplitude.RUE.UPDRS3','Rest.Tremor.Amplitude.LUE.UPDRS3', 'Rest.Tremor.Amplitude.RLE.UPDRS3' , 'Rest.Tremor.Amplitude.LLE.UPDRS3' , 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3', 'Constancy.of.Rest.Tremor.UPDRS3'], 'Tremor.Subscore.UPDRS3')
     updrs_numeric = add_subscore(updrs_numeric, ['Walking.Difficulty.UPDRS2' ,  'Freezing.while.Walking.UPDRS2' ,'Gait.Problems.UPDRS3'  , 'Freezing.of.Gait.UPDRS3' , 'Postural.Stability.Problems.UPDRS3'], 'PIGD.Subscore.UPDRS3')
@@ -101,7 +102,6 @@ def merge_updrs_files(ppmi_merge):
     updrs_cat.drop(['INFODT','PATNO','EVENT_ID'], axis = 1, inplace = True)
     updrs_merged = pd.concat([updrs_cat, updrs_numeric], axis = 1)
     ppmi_merge = pd.merge(ppmi_merge, updrs_merged, on = ['PATNO', 'EVENT_ID'], how = "outer")
-
 
     ## Make any dominant side of disease that are NA into 'Symmetric' FIXME CHECK
     domsideisna = ppmi_merge['Dominant.Side.Disease'].isna()
@@ -150,13 +150,11 @@ def create_cohort_df(excel_file : pd.ExcelFile) :
     cohort_df['CONHC'].replace({1 : 'Healthy Control',  0 : ''}, inplace = True)
     cohort_df['CONSWEDD'].replace({1 : 'SWEDD',  0 : 'SWEDD/PD'}, inplace = True)
     cohort_df['Comments'].replace({'MSA' : 'Multiple System Atrophy'}, inplace = True)
-    
     cohort_df = merge_columns(cohort_df, ['CONPD', 'CONPROD', 'CONHC', 'CONSWEDD','Comments'], 'Consensus.Diagnosis', ': ') # Get one column for Consensus Diagnosis with comments merged in
     cohort_df = merge_columns(cohort_df, ['Subgroup', 'Enrollment.Subtype'], 'Enroll.Subtype', '') # Get one column for Enroll.Subtype
     cohort_df = cohort_df.loc[:, ~cohort_df.columns.str.startswith(tuple(['CON','ENRL']))] # Remove columns that begin with CON and ENRL
     
     return cohort_df
-
 
 
 
@@ -741,17 +739,13 @@ def fixed_variables(df: pd.DataFrame, fixed_var_list: List[str]) -> pd.DataFrame
 
 
 def add_Visit(df) :
-    ## Add in Visit column
     df['Visit'] = np.NaN # Initialize Visit col
-    searchfor = ['Baseline', 'Visit Month '] # Strings to search for
+    searchfor = ['BL', 'V', 'R'] # Strings to search for
     temp = df['EVENT_ID'].str.contains('|'.join(searchfor)) # locations of where row contains str: baseline or visit month
     df['Visit'].loc[temp == True] = df['EVENT_ID'].loc[temp == True] # Fill in 'Visit' col with event.ID for baseline or visit month
-    df['Visit'] = df['Visit'].str.replace("Remote Visit Month ", "") # Replace Remote visit month with '' (want only month number)
-    df['Visit'] = df['Visit'].str.replace("Visit Month ", "") # Replace Visit month with '' (want only month number)
-    df['Visit'] = df['Visit'].str.replace("Baseline", "0") # Replace baseline with 0
-    df['Visit'] = df['Visit'].fillna(9999) # Filling with 9999 so we can change this col to int
-    df['Visit'] = df['Visit'].astype(int) # str to int
-    df['Visit'] = df['Visit'].replace(9999, np.nan)  # Replace 9999 with nan
+    df['Visit'] = df['Visit'].str.replace("R", "") # Replace Remote visit month with '' (want only month number)
+    df['Visit'] = df['Visit'].str.replace("V", "") # Replace Visit month with '' (want only month number)
+    df['Visit'] = df['Visit'].str.replace("BL", "0") # Replace baseline with 0
     return df
 
 
