@@ -16,15 +16,14 @@ code_list = pd.read_csv(glob.glob(ppmi_download_path + 'Code_List*Annotated__*.c
     
     
 def main() :
-    cohort_df = create_cohort(ppmi_download_path)
+    cohort_df = create_cohort()
     ppmi_merge = merge_clinical_files(cohort_df)
     ppmi_merge = merge_updrs_files(ppmi_merge)
-    print(ppmi_merge['EVENT_ID'])
     ppmi_merge = cleanup(ppmi_merge)
     
 
 
-def create_cohort(ppmi_download_path) : 
+def create_cohort() : 
     xlsx = pd.ExcelFile(glob.glob(ppmi_download_path + '*Consensus_Committee_Analytic_Datasets*.xlsx')[0]) # Read in main xlsx file
     cohort_df = create_cohort_df(xlsx) 
     cohort_df = decode(cohort_df, code_list, 'PATIENT_STATUS', ['PHENOCNV'],rename_cols = {'Cohort' : 'Enroll.Diagnosis' , 'PHENOCNV' : 'Subject.Phenoconverted'})
@@ -33,38 +32,38 @@ def create_cohort(ppmi_download_path) :
 
  
 def merge_clinical_files(cohort_df) : 
-    ppmi_merge = merge_and_transform_data('Age_at_visit_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO', 'EVENT_ID', 'AGE_AT_VISIT'], rename_list = {'AGE_AT_VISIT' : 'Age'}, merge_on = ['PATNO'], merge_how = "outer", df=cohort_df)    
-    ppmi_merge = merge_and_transform_data('Demographics_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO','EVENT_ID','SEX', 'HANDED', 'BIRTHDT','AFICBERB','ASHKJEW','BASQUE', 'HISPLAT', 'RAASIAN', 'RABLACK', 'RAHAWOPI', 'RAINDALS', 'RANOS', 'RAWHITE'], rename_list = {'SEX' : 'Sex', 'HANDED' : 'Handed', 'BIRTHDT' : 'BirthDate',  'AFICBERB' : 'African.Berber.Race','ASHKJEW':'Ashkenazi.Jewish.Race', 'BASQUE' : 'Basque.Race', 'HISPLAT' : 'Hispanic.Latino.Race', 'RAASIAN' : 'Asian.Race', 'RABLACK' : 'African.American.Race', 'RAHAWOPI' : 'Hawian.Other.Pacific.Islander.Race', 'RAINDALS' : 'Indian.Alaska.Native.Race', 'RANOS' : 'Not.Specified.Race', 'RAWHITE': 'White.Race'},mod_name = 'SCREEN', decode_list = ['SEX', 'HANDED','AFICBERB','ASHKJEW','BASQUE', 'HISPLAT', 'RAASIAN', 'RABLACK', 'RAHAWOPI', 'RAINDALS', 'RANOS', 'RAWHITE'], df = ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Vital_Signs_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO','EVENT_ID','INFODT', 'WGTKG', 'HTCM', 'SYSSUP', 'DIASUP', 'SYSSTND', 'DIASTND'], rename_list = {'SEX' : 'Sex', 'HANDED' : 'Handed', 'BIRTHDT' : 'BirthDate', 'WGTKG' : 'Weight(kg)', 'HTCM' : 'Height(cm)','SYSSUP':'Systolic.BP.Sitting', 'DIASUP' : 'Diastolic.BP.Sitting', 'SYSSTND' : 'Systolic.BP.Standing' , 'DIASTND': 'Diastolic.BP.Standing'}, df = ppmi_merge)
-    ppmi_merge = merge_and_transform_data('PD_Diagnosis_History_' + date + '.csv',  ppmi_download_path, list_cols = ['PATNO', 'EVENT_ID', 'SXDT','PDDXDT'], rename_list = { 'SXDT' : 'First.Symptom.Date', 'PDDXDT': 'PD.Diagnosis.Date'}, df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('SCOPA-AUT_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO', 'EVENT_ID', 'SCAU8', 'SCAU9', 'SCAU15', 'SCAU16'], df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Modified_Schwab___England_Activities_of_Daily_Living_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO', 'EVENT_ID','MSEADLG'], df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Conclusion_of_Study_Participation_' + date + '.csv', ppmi_download_path, list_cols =['PATNO', 'EVENT_ID', 'COMPLT', 'WDRSN', 'WDDT'], rename_list = {'COMPLT' : 'Completed.Study' , 'WDRSN': 'Reason.for.Withdrawal','WDDT' : 'Withdrawal.Date'}, df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv', ppmi_download_path, list_cols = ['PATNO', 'EVENT_ID', 'DOMSIDE'], mod_name = 'PDDXHIST', decode_list = ['DOMSIDE'], rename_list = {'DOMSIDE' : 'Dominant.Side.Disease'}, df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Participant_Motor_Function_Questionnaire_' + date + '.csv', ppmi_download_path, list_cols =['PATNO', 'EVENT_ID', 'PAG_NAME', 'CMPLBY2', 'TRBUPCHR', 'WRTSMLR', 'VOICSFTR', 'POORBAL', 'FTSTUCK', 'LSSXPRSS', 'ARMLGSHK', 'TRBBUTTN', 'SHUFFLE', 'MVSLOW', 'TOLDPD'], mod_name = 'PQUEST', decode_list =  ['CMPLBY2', 'PAG_NAME','TRBUPCHR', 'WRTSMLR', 'VOICSFTR', 'POORBAL', 'FTSTUCK', 'LSSXPRSS', 'ARMLGSHK', 'TRBBUTTN', 'SHUFFLE', 'MVSLOW', 'TOLDPD'],rename_list = {'PAG_NAME' : 'Motor.Function.Page.Name', 'CMPLBY2' : 'Motor.Function.Source', 'TRBUPCHR' : 'Trouble.Rising.Chair', 'WRTSMLR' : 'Writing.Smaller', 'VOICSFTR' : 'Voice.Softer' , 'POORBAL': 'Poor.Balance' , 'FTSTUCK' : 'Feet.Stuck', 'LSSXPRSS' : 'Less.Expressive' , 'ARMLGSHK':'Arms/Legs.Shake', 'TRBBUTTN' : 'Trouble.Buttons' , 'SHUFFLE' : 'Shuffle.Feet' , 'MVSLOW' : 'Slow.Movements' , 'TOLDPD' : 'Been.Told.PD'}, df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Cognitive_Categorization_' + date + '.csv', ppmi_download_path, list_cols =  ['PATNO' , 'EVENT_ID', 'PAG_NAME', 'COGDECLN', 'FNCDTCOG' , 'COGDXCL' ,'PTCGBOTH' , 'COGSTATE' , 'COGCAT_TEXT'], mod_name = 'COGCATG', decode_list = ['PAG_NAME', 'COGDECLN', 'FNCDTCOG' , 'COGDXCL' ,'PTCGBOTH' , 'COGSTATE' , 'COGCAT_TEXT'], rename_list = {'PAG_NAME' : 'Cognitive.Page.Name', 'COGDECLN' : 'Cognitive.Decline', 'FNCDTCOG' : 'Functional.Cognitive.Impairment', 'COGDXCL' : 'Confidence.Level.Cognitive.Diagnosis', 'PTCGBOTH' : 'Cognitive.Source', 'COGSTATE' : 'Cognitive.State' , 'COGCAT_TEXT' : 'Cognitive.Tscore.Cat'}, df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Montreal_Cognitive_Assessment__MoCA__' + date + '.csv', ppmi_download_path,  list_cols =  ['PATNO', 'EVENT_ID', 'MCATOT'], rename_list = {'MCATOT' : 'MOCA.Total'}, df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Socio-Economics_' + date + '.csv', ppmi_download_path, list_cols =['PATNO', 'EDUCYRS'], merge_on = ['PATNO'], merge_how = "outer", rename_list = {'EDUCYRS' : 'Education.Years'}, df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Modified_Boston_Naming_Test_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO', 'EVENT_ID', 'MBSTNSCR', 'MBSTNCRC', 'MBSTNCRR'], df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Clock_Drawing_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO', 'EVENT_ID', 'CLCKTOT'], df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Benton_Judgement_of_Line_Orientation_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO', 'EVENT_ID', 'JLO_TOTCALC','JLO_TOTRAW'], df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Letter_-_Number_Sequencing_' + date + '.csv', ppmi_download_path, list_cols =  ['PATNO', 'EVENT_ID', 'LNS_TOTRAW'], df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Modified_Semantic_Fluency_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO', 'EVENT_ID', 'DVS_SFTANIM', 'DVT_SFTANIM'], df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Hopkins_Verbal_Learning_Test_-_Revised_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO', 'EVENT_ID', 'DVT_DELAYED_RECALL', 'DVT_TOTAL_RECALL','DVT_RECOG_DISC_INDEX','DVT_RETENTION'], df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('Symbol_Digit_Modalities_Test_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO', 'EVENT_ID', 'SDMTOTAL'], rename_list = {'CLCKTOT' : 'Clock.Drawing.Total', 'JLOTOTCALC' : 'JOLO.Total', 'LNS_TOTRAW' : 'Letter.Number.Sequencing.Total','DVS_SFTANIM' : 'Semantic.Fluency.Scaled.Score', 'DVT_SFTANIM' :'Sematnic.Fluency.TScore', 'DVT_TOTAL_RECALL' : 'DVT.Total.RECALL','SDMTOTAL' : 'Symbol.Digit.Modalities.Total'}, df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('REM_Sleep_Behavior_Disorder_Questionnaire_' + date + '.csv', ppmi_download_path, list_cols =   ['PATNO', 'EVENT_ID', 'PAG_NAME', 'PTCGBOTH', 'DRMVIVID', 'DRMAGRAC', 'DRMNOCTB', 'SLPLMBMV', 'SLPINJUR', 'DRMVERBL', 'DRMFIGHT', 'DRMUMV', 'DRMOBJFL', 'MVAWAKEN',    'DRMREMEM',    'SLPDSTRB',    'STROKE', 'HETRA', 'PARKISM', 'RLS', 'NARCLPSY', 'DEPRS', 'EPILEPSY', 'BRNINFM', 'CNSOTH'], rename_list = {'PAG_NAME' : 'REM.Page.Name'}, mod_name = 'REMSLEEP', decode_list = ['PAG_NAME','DRMVIVID',    'DRMAGRAC',    'DRMNOCTB',    'SLPLMBMV',    'SLPINJUR',    'DRMVERBL',    'DRMFIGHT',    'DRMUMV',    'DRMOBJFL',    'MVAWAKEN',    'DRMREMEM',    'SLPDSTRB',    'STROKE',    'HETRA',    'PARKISM',    'RLS','NARCLPSY',    'DEPRS',    'EPILEPSY',    'BRNINFM',    'CNSOTH' ], df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('DaTScan_Analysis_' + date + '.csv', ppmi_download_path, list_cols =  ['PATNO','EVENT_ID','DATSCAN_DATE','DATSCAN_CAUDATE_R','DATSCAN_CAUDATE_L','DATSCAN_PUTAMEN_R','DATSCAN_PUTAMEN_L','DATSCAN_ANALYZED','DATSCAN_NOT_ANALYZED_REASON'], df= ppmi_merge)
-    ppmi_merge = merge_and_transform_data('DaTScan_Imaging_' + date + '.csv', ppmi_download_path, list_cols = ['PATNO','EVENT_ID','DATSCAN','INFODT', 'PREVDATDT','SCNLOC','SCNINJCT','VSINTRPT','VSRPTELG'], mod_name = 'DATSCAN', decode_list =['DATSCAN', 'SCNLOC','SCNINJCT', 'VSINTRPT','VSRPTELG'], rename_list = {'INFODT_x' : 'INFODT', 'INFODT_y' : 'DaTScan.INFODT', 'SCNLOC' : 'Location.Scan.Completed' , 'PREVDATDT' : 'Date.DaTscan.Imaging.Completed.Previously', 'SCNINJCT' : 'Scan.Injection', 'VSINTRPT' : 'Visual.Interpretation.Report', 'VSRPTELG' : 'Visual.Interpretation.Report(eligible/not)'}, df= ppmi_merge)   
+    ppmi_merge = merge_and_transform_data('Age_at_visit_' + date + '.csv', list_cols = ['PATNO', 'EVENT_ID', 'AGE_AT_VISIT'], rename_list = {'AGE_AT_VISIT' : 'Age'}, merge_on = ['PATNO'], merge_how = "outer", df=cohort_df)    
+    ppmi_merge = merge_and_transform_data('Demographics_' + date + '.csv', list_cols = ['PATNO','EVENT_ID','SEX', 'HANDED', 'BIRTHDT','AFICBERB','ASHKJEW','BASQUE', 'HISPLAT', 'RAASIAN', 'RABLACK', 'RAHAWOPI', 'RAINDALS', 'RANOS', 'RAWHITE'], rename_list = {'SEX' : 'Sex', 'HANDED' : 'Handed', 'BIRTHDT' : 'BirthDate',  'AFICBERB' : 'African.Berber.Race','ASHKJEW':'Ashkenazi.Jewish.Race', 'BASQUE' : 'Basque.Race', 'HISPLAT' : 'Hispanic.Latino.Race', 'RAASIAN' : 'Asian.Race', 'RABLACK' : 'African.American.Race', 'RAHAWOPI' : 'Hawian.Other.Pacific.Islander.Race', 'RAINDALS' : 'Indian.Alaska.Native.Race', 'RANOS' : 'Not.Specified.Race', 'RAWHITE': 'White.Race'},mod_name = 'SCREEN', decode_list = ['SEX', 'HANDED','AFICBERB','ASHKJEW','BASQUE', 'HISPLAT', 'RAASIAN', 'RABLACK', 'RAHAWOPI', 'RAINDALS', 'RANOS', 'RAWHITE'], df = ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Vital_Signs_' + date + '.csv', list_cols = ['PATNO','EVENT_ID','INFODT', 'WGTKG', 'HTCM', 'SYSSUP', 'DIASUP', 'SYSSTND', 'DIASTND'], rename_list = {'SEX' : 'Sex', 'HANDED' : 'Handed', 'BIRTHDT' : 'BirthDate', 'WGTKG' : 'Weight(kg)', 'HTCM' : 'Height(cm)','SYSSUP':'Systolic.BP.Sitting', 'DIASUP' : 'Diastolic.BP.Sitting', 'SYSSTND' : 'Systolic.BP.Standing' , 'DIASTND': 'Diastolic.BP.Standing'}, df = ppmi_merge)
+    ppmi_merge = merge_and_transform_data('PD_Diagnosis_History_' + date + '.csv', list_cols = ['PATNO', 'EVENT_ID', 'SXDT','PDDXDT'], rename_list = { 'SXDT' : 'First.Symptom.Date', 'PDDXDT': 'PD.Diagnosis.Date'}, df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('SCOPA-AUT_' + date + '.csv', list_cols = ['PATNO', 'EVENT_ID', 'SCAU8', 'SCAU9', 'SCAU15', 'SCAU16'], df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Modified_Schwab___England_Activities_of_Daily_Living_' + date + '.csv', list_cols = ['PATNO', 'EVENT_ID','MSEADLG'], df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Conclusion_of_Study_Participation_' + date + '.csv', list_cols =['PATNO', 'EVENT_ID', 'COMPLT', 'WDRSN', 'WDDT'], rename_list = {'COMPLT' : 'Completed.Study' , 'WDRSN': 'Reason.for.Withdrawal','WDDT' : 'Withdrawal.Date'}, df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('PPMI_Original_Cohort_BL_to_Year_5_Dataset_Apr2020.csv', list_cols = ['PATNO', 'EVENT_ID', 'DOMSIDE'], mod_name = 'PDDXHIST', decode_list = ['DOMSIDE'], rename_list = {'DOMSIDE' : 'Dominant.Side.Disease'}, df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Participant_Motor_Function_Questionnaire_' + date + '.csv', list_cols =['PATNO', 'EVENT_ID', 'PAG_NAME', 'CMPLBY2', 'TRBUPCHR', 'WRTSMLR', 'VOICSFTR', 'POORBAL', 'FTSTUCK', 'LSSXPRSS', 'ARMLGSHK', 'TRBBUTTN', 'SHUFFLE', 'MVSLOW', 'TOLDPD'], mod_name = 'PQUEST', decode_list =  ['CMPLBY2', 'PAG_NAME','TRBUPCHR', 'WRTSMLR', 'VOICSFTR', 'POORBAL', 'FTSTUCK', 'LSSXPRSS', 'ARMLGSHK', 'TRBBUTTN', 'SHUFFLE', 'MVSLOW', 'TOLDPD'],rename_list = {'PAG_NAME' : 'Motor.Function.Page.Name', 'CMPLBY2' : 'Motor.Function.Source', 'TRBUPCHR' : 'Trouble.Rising.Chair', 'WRTSMLR' : 'Writing.Smaller', 'VOICSFTR' : 'Voice.Softer' , 'POORBAL': 'Poor.Balance' , 'FTSTUCK' : 'Feet.Stuck', 'LSSXPRSS' : 'Less.Expressive' , 'ARMLGSHK':'Arms/Legs.Shake', 'TRBBUTTN' : 'Trouble.Buttons' , 'SHUFFLE' : 'Shuffle.Feet' , 'MVSLOW' : 'Slow.Movements' , 'TOLDPD' : 'Been.Told.PD'}, df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Cognitive_Categorization_' + date + '.csv', list_cols =  ['PATNO' , 'EVENT_ID', 'PAG_NAME', 'COGDECLN', 'FNCDTCOG' , 'COGDXCL' ,'PTCGBOTH' , 'COGSTATE' , 'COGCAT_TEXT'], mod_name = 'COGCATG', decode_list = ['PAG_NAME', 'COGDECLN', 'FNCDTCOG' , 'COGDXCL' ,'PTCGBOTH' , 'COGSTATE' , 'COGCAT_TEXT'], rename_list = {'PAG_NAME' : 'Cognitive.Page.Name', 'COGDECLN' : 'Cognitive.Decline', 'FNCDTCOG' : 'Functional.Cognitive.Impairment', 'COGDXCL' : 'Confidence.Level.Cognitive.Diagnosis', 'PTCGBOTH' : 'Cognitive.Source', 'COGSTATE' : 'Cognitive.State' , 'COGCAT_TEXT' : 'Cognitive.Tscore.Cat'}, df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Montreal_Cognitive_Assessment__MoCA__' + date + '.csv',  list_cols =  ['PATNO', 'EVENT_ID', 'MCATOT'], rename_list = {'MCATOT' : 'MOCA.Total'}, df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Socio-Economics_' + date + '.csv', list_cols =['PATNO', 'EDUCYRS'], merge_on = ['PATNO'], merge_how = "outer", rename_list = {'EDUCYRS' : 'Education.Years'}, df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Modified_Boston_Naming_Test_' + date + '.csv', list_cols = ['PATNO', 'EVENT_ID', 'MBSTNSCR', 'MBSTNCRC', 'MBSTNCRR'], df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Clock_Drawing_' + date + '.csv', list_cols = ['PATNO', 'EVENT_ID', 'CLCKTOT'], df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Benton_Judgement_of_Line_Orientation_' + date + '.csv', list_cols = ['PATNO', 'EVENT_ID', 'JLO_TOTCALC','JLO_TOTRAW'], df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Letter_-_Number_Sequencing_' + date + '.csv', list_cols =  ['PATNO', 'EVENT_ID', 'LNS_TOTRAW'], df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Modified_Semantic_Fluency_' + date + '.csv', list_cols = ['PATNO', 'EVENT_ID', 'DVS_SFTANIM', 'DVT_SFTANIM'], df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Hopkins_Verbal_Learning_Test_-_Revised_' + date + '.csv', list_cols = ['PATNO', 'EVENT_ID', 'DVT_DELAYED_RECALL', 'DVT_TOTAL_RECALL','DVT_RECOG_DISC_INDEX','DVT_RETENTION'], df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('Symbol_Digit_Modalities_Test_' + date + '.csv', list_cols = ['PATNO', 'EVENT_ID', 'SDMTOTAL'], rename_list = {'CLCKTOT' : 'Clock.Drawing.Total', 'JLOTOTCALC' : 'JOLO.Total', 'LNS_TOTRAW' : 'Letter.Number.Sequencing.Total','DVS_SFTANIM' : 'Semantic.Fluency.Scaled.Score', 'DVT_SFTANIM' :'Sematnic.Fluency.TScore', 'DVT_TOTAL_RECALL' : 'DVT.Total.RECALL','SDMTOTAL' : 'Symbol.Digit.Modalities.Total'}, df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('REM_Sleep_Behavior_Disorder_Questionnaire_' + date + '.csv', list_cols =   ['PATNO', 'EVENT_ID', 'PAG_NAME', 'PTCGBOTH', 'DRMVIVID', 'DRMAGRAC', 'DRMNOCTB', 'SLPLMBMV', 'SLPINJUR', 'DRMVERBL', 'DRMFIGHT', 'DRMUMV', 'DRMOBJFL', 'MVAWAKEN',    'DRMREMEM',    'SLPDSTRB',    'STROKE', 'HETRA', 'PARKISM', 'RLS', 'NARCLPSY', 'DEPRS', 'EPILEPSY', 'BRNINFM', 'CNSOTH'], rename_list = {'PAG_NAME' : 'REM.Page.Name'}, mod_name = 'REMSLEEP', decode_list = ['PAG_NAME','DRMVIVID',    'DRMAGRAC',    'DRMNOCTB',    'SLPLMBMV',    'SLPINJUR',    'DRMVERBL',    'DRMFIGHT',    'DRMUMV',    'DRMOBJFL',    'MVAWAKEN',    'DRMREMEM',    'SLPDSTRB',    'STROKE',    'HETRA',    'PARKISM',    'RLS','NARCLPSY',    'DEPRS',    'EPILEPSY',    'BRNINFM',    'CNSOTH' ], df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('DaTScan_Analysis_' + date + '.csv', list_cols =  ['PATNO','EVENT_ID','DATSCAN_DATE','DATSCAN_CAUDATE_R','DATSCAN_CAUDATE_L','DATSCAN_PUTAMEN_R','DATSCAN_PUTAMEN_L','DATSCAN_ANALYZED','DATSCAN_NOT_ANALYZED_REASON'], df= ppmi_merge)
+    ppmi_merge = merge_and_transform_data('DaTScan_Imaging_' + date + '.csv', list_cols = ['PATNO','EVENT_ID','DATSCAN','INFODT', 'PREVDATDT','SCNLOC','SCNINJCT','VSINTRPT','VSRPTELG'], mod_name = 'DATSCAN', decode_list =['DATSCAN', 'SCNLOC','SCNINJCT', 'VSINTRPT','VSRPTELG'], rename_list = {'INFODT_x' : 'INFODT', 'INFODT_y' : 'DaTScan.INFODT', 'SCNLOC' : 'Location.Scan.Completed' , 'PREVDATDT' : 'Date.DaTscan.Imaging.Completed.Previously', 'SCNINJCT' : 'Scan.Injection', 'VSINTRPT' : 'Visual.Interpretation.Report', 'VSRPTELG' : 'Visual.Interpretation.Report(eligible/not)'}, df= ppmi_merge)   
     ppmi_merge['INFODT'].fillna(ppmi_merge['DaTScan.INFODT'], inplace = True) # Fill in NaN infodts with datscan infodts if NA
     ppmi_merge = remove_duplicate_datscans(ppmi_merge) # FIXME - After merging in datscan files, duplicate event ids being created one with DATSCAN as "Completed" one with DATSCAN as "not completed" - if there are both of these - keep only "Completed"
     ppmi_merge = add_diagnosis_change(cohort_df, ppmi_merge)
-    ppmi_merge = add_concomitant_med_log(ppmi_merge, ppmi_download_path)
-    ppmi_merge = add_LEDD(ppmi_merge, ppmi_download_path)
+    ppmi_merge = add_concomitant_med_log(ppmi_merge)
+    ppmi_merge = add_LEDD(ppmi_merge)
     ppmi_merge = make_categorical_LEDD_col(ppmi_merge, 'LEDD.sum', 'LEDD.sum.Cat', 3)
     ppmi_merge = make_categorical_LEDD_col(ppmi_merge, 'LEDD.ongoing.sum', 'LEDD.ongoing.sum.Cat',3)
-    ppmi_merge = add_comorbidities(ppmi_merge, ppmi_download_path)
+    ppmi_merge = add_comorbidities(ppmi_merge)
     ppmi_merge['RBDTotal.REM'] = ppmi_merge[['DRMVIVID',    'DRMAGRAC',    'DRMNOCTB',    'SLPLMBMV',    'SLPINJUR',    'DRMVERBL',    'DRMFIGHT',    'DRMUMV',    'DRMOBJFL',    'MVAWAKEN',    'DRMREMEM',    'SLPDSTRB',    'STROKE',    'HETRA',    'PARKISM',    'RLS','NARCLPSY',    'DEPRS',    'EPILEPSY',    'BRNINFM',    'CNSOTH']].sum(axis = 1) # Add an RBDTotal.REM column
-    ppmi_merge = add_mri_csv(ppmi_merge, ppmi_download_path)
+    ppmi_merge = add_mri_csv(ppmi_merge)
     ppmi_merge = get_enrollment_dx_nonanalytic(ppmi_merge, cohort_df) 
     ppmi_merge = add_DXsimplified(ppmi_merge)
     ppmi_merge = add_PD_Disease_Duration(ppmi_merge)
@@ -73,11 +72,11 @@ def merge_clinical_files(cohort_df) :
 
 
 def merge_updrs_files(ppmi_merge):
-    updrs_part1 = merge_and_transform_data('MDS-UPDRS_Part_I_' + date + '.csv', ppmi_download_path, list_cols= ['ORIG_ENTRY','LAST_UPDATE','REC_ID'], list_cols_drop = True, rename_list= {'PAG_NAME' : 'Page.Name.UPDRS1', 'NUPSOURC' : 'NUPSOURC.UPDRS1'}, mod_name='NUPDRS1', decode_list= ['PAG_NAME', 'NUPSOURC'],ext_name = '.UPDRS1', ext_drop = ['PATNO','EVENT_ID','PAG_NAME','INFODT','NUPSOURC'])
-    updrs_part1_pq = merge_and_transform_data('MDS-UPDRS_Part_I_Patient_Questionnaire_' + date + '.csv', ppmi_download_path, list_cols= ['ORIG_ENTRY','LAST_UPDATE','REC_ID','INFODT'], list_cols_drop = True, rename_list= {'PAG_NAME' : 'Page.Name.UPDRS1PQ','NUPSOURC' : 'NUPSOURC.UPDRS1PQ'},  mod_name='NUPDRS1P', decode_list= ['PAG_NAME', 'NUPSOURC'], df = updrs_part1, ext_name = '.UPDRS1PQ', ext_drop = ['PATNO','EVENT_ID','INFODT','PAG_NAME', 'NUPSOURC'])
-    updrs_part2 = merge_and_transform_data('MDS_UPDRS_Part_II__Patient_Questionnaire_' + date + '.csv', ppmi_download_path, list_cols= ['ORIG_ENTRY','LAST_UPDATE','REC_ID','INFODT'], list_cols_drop = True, rename_list= {'PAG_NAME' : 'Page.Name.UPDRS2', 'NUPSOURC' : 'NUPSOURC.UPDRS2'},  mod_name='NUPDRS2P', decode_list= ['PAG_NAME', 'NUPSOURC'], df = updrs_part1_pq, ext_name = '.UPDRS2', ext_drop = ['PATNO','EVENT_ID','INFODT', 'PAG_NAME','NUPSOURC'])
-    updrs_part3 = merge_and_transform_data('MDS-UPDRS_Part_III_' + date + '.csv', ppmi_download_path, list_cols= ['ORIG_ENTRY','LAST_UPDATE','REC_ID','INFODT'], list_cols_drop = True, rename_list= {'PAG_NAME' : 'Page.Name.UPDRS3'},  mod_name='NUPDRS3TRT', decode_list= ['PAG_NAME'], df = updrs_part2, ext_name = '.UPDRS3',ext_drop = ['PATNO','EVENT_ID','INFODT','PAG_NAME'])
-    updrs_temp = merge_and_transform_data('MDS-UPDRS_Part_IV__Motor_Complications_' + date + '.csv', ppmi_download_path, list_cols= ['ORIG_ENTRY','LAST_UPDATE','REC_ID','INFODT'], list_cols_drop = True, rename_list= {'PAG_NAME' : 'Page.Name.UPDRS4'}, mod_name='NUPDRS4', decode_list= ['PAG_NAME'], df = updrs_part3, ext_name = '.UPDRS4', ext_drop = ['PATNO','EVENT_ID','INFODT','PAG_NAME'])
+    updrs_part1 = merge_and_transform_data('MDS-UPDRS_Part_I_' + date + '.csv', list_cols= ['ORIG_ENTRY','LAST_UPDATE','REC_ID'], list_cols_drop = True, rename_list= {'PAG_NAME' : 'Page.Name.UPDRS1', 'NUPSOURC' : 'NUPSOURC.UPDRS1'}, mod_name='NUPDRS1', decode_list= ['PAG_NAME', 'NUPSOURC'],ext_name = '.UPDRS1', ext_drop = ['PATNO','EVENT_ID','PAG_NAME','INFODT','NUPSOURC'])
+    updrs_part1_pq = merge_and_transform_data('MDS-UPDRS_Part_I_Patient_Questionnaire_' + date + '.csv', list_cols= ['ORIG_ENTRY','LAST_UPDATE','REC_ID','INFODT'], list_cols_drop = True, rename_list= {'PAG_NAME' : 'Page.Name.UPDRS1PQ','NUPSOURC' : 'NUPSOURC.UPDRS1PQ'},  mod_name='NUPDRS1P', decode_list= ['PAG_NAME', 'NUPSOURC'], df = updrs_part1, ext_name = '.UPDRS1PQ', ext_drop = ['PATNO','EVENT_ID','INFODT','PAG_NAME', 'NUPSOURC'])
+    updrs_part2 = merge_and_transform_data('MDS_UPDRS_Part_II__Patient_Questionnaire_' + date + '.csv', list_cols= ['ORIG_ENTRY','LAST_UPDATE','REC_ID','INFODT'], list_cols_drop = True, rename_list= {'PAG_NAME' : 'Page.Name.UPDRS2', 'NUPSOURC' : 'NUPSOURC.UPDRS2'},  mod_name='NUPDRS2P', decode_list= ['PAG_NAME', 'NUPSOURC'], df = updrs_part1_pq, ext_name = '.UPDRS2', ext_drop = ['PATNO','EVENT_ID','INFODT', 'PAG_NAME','NUPSOURC'])
+    updrs_part3 = merge_and_transform_data('MDS-UPDRS_Part_III_' + date + '.csv', list_cols= ['ORIG_ENTRY','LAST_UPDATE','REC_ID','INFODT'], list_cols_drop = True, rename_list= {'PAG_NAME' : 'Page.Name.UPDRS3'},  mod_name='NUPDRS3TRT', decode_list= ['PAG_NAME'], df = updrs_part2, ext_name = '.UPDRS3',ext_drop = ['PATNO','EVENT_ID','INFODT','PAG_NAME'])
+    updrs_temp = merge_and_transform_data('MDS-UPDRS_Part_IV__Motor_Complications_' + date + '.csv', list_cols= ['ORIG_ENTRY','LAST_UPDATE','REC_ID','INFODT'], list_cols_drop = True, rename_list= {'PAG_NAME' : 'Page.Name.UPDRS4'}, mod_name='NUPDRS4', decode_list= ['PAG_NAME'], df = updrs_part3, ext_name = '.UPDRS4', ext_drop = ['PATNO','EVENT_ID','INFODT','PAG_NAME'])
     updrs_cat = updrs_temp.copy()
     updrs_numeric = format_updrs(updrs_temp)
     updrs_numeric.rename(columns = {'NHY.UPDRS3' : 'Hoehn.and.Yahr.Stage.UPDRS3', 'NP3BRADY.UPDRS3' : 'Global.Spontaneity.of.Movement.UPDRS3', 'NP3PTRMR.UPDRS3' : 'Postural.Tremor.Right.Hand.UPDRS3' , 'NP3PTRML.UPDRS3' : 'Postural.Tremor.Left.Hand.UPDRS3' , 'NP3KTRMR.UPDRS3' : 'Kinetic.Tremor.Right.Hand.UPDRS3', 'NP3KTRML.UPDRS3' : 'Kinetic.Tremor.Left.Hand.UPDRS3', 'NP3RTARU.UPDRS3' : 'Rest.Tremor.Amplitude.RUE.UPDRS3', 'NP3RTALU.UPDRS3' : 'Rest.Tremor.Amplitude.LUE.UPDRS3', 'NP3RTARL.UPDRS3' : 'Rest.Tremor.Amplitude.RLE.UPDRS3' ,'NP3RTALL.UPDRS3' : 'Rest.Tremor.Amplitude.LLE.UPDRS3' ,'NP3RTALJ.UPDRS3' : 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS3', 'NP3RTCON.UPDRS3' : 'Constancy.of.Rest.Tremor.UPDRS3', 'NP3SPCH.UPDRS3' : 'Speech.Difficulty.UPDRS3', 'NP3FACXP.UPDRS3' : 'Facial.Expression.Difficulty.UPDRS3' , 'NP3RIGN.UPDRS3' : 'Rigidity.Neck.UPDRS3' , 'NP3RIGRU.UPDRS3' : 'Rigidity.RUE.UPDRS3', 'NP3RIGLU.UPDRS3' : 'Rigidity.LUE.UPDRS3', 'NP3RIGRL.UPDRS3' : 'Rigidity.RLE.UPDRS3', 'NP3RIGLL.UPDRS3' : 'Rigidity.LLE.UPDRS3', 'NP3FTAPR.UPDRS3' : 'Finger.Tapping.Right.Hand.UPDRS3' ,'NP3FTAPL.UPDRS3' : 'Finger.Tapping.Left.Hand.UPDRS3' ,'NP3HMOVR.UPDRS3' : 'Hand.Movements.Right.Hand.UPDRS3', 'NP3HMOVL.UPDRS3' : 'Hand.Movements.Left.Hand.UPDRS3', 'NP3PRSPR.UPDRS3' : 'Pronation.Supination.Right.Hand.UPDRS3', 'NP3PRSPL.UPDRS3' : 'Pronation.Supination.Left.Hand.UPDRS3' , 'NP3TTAPR.UPDRS3' : 'Toe.Tapping.Right.Foot.UPDRS3' , 'NP3TTAPL.UPDRS3' : 'Toe.Tapping.Left.Foot.UPDRS3', 'NP3LGAGR.UPDRS3' : 'Leg.Agility.Right.Leg.UPDRS3', 'NP3LGAGL.UPDRS3' : 'Leg.Agility.Left.Leg.UPDRS3', 'NP3RISNG.UPDRS3' : 'Rising.from.Chair.UPDRS3', 'NP3GAIT.UPDRS3' : 'Gait.Problems.UPDRS3' ,'NP3FRZGT.UPDRS3' : 'Freezing.of.Gait.UPDRS3' ,'NP3PSTBL.UPDRS3' : 'Postural.Stability.Problems.UPDRS3', 'NP3POSTR.UPDRS3' : 'Posture.Problems.UPDRS3' , 'NP3TOT.UPDRS3':'Total.UPDRS3','NP1COG.UPDRS1' : 'Cognitive.Impairment.UPDRS1', 'NP1HALL.UPDRS1' : 'Hallucinations.and.Psychosis.UPDRS1', 'NP1DPRS.UPDRS1' : 'Depressed.Moods.UPDRS1', 'NP1ANXS.UPDRS1' : 'Anxious.Moods.UPDRS1', 'NP1APAT.UPDRS1' : 'Apathy.UPDRS1', 'NP1DDS.UPDRS1' : 'Features.of.Dopamine.Dysregulation.Syndrome.UPDRS1', 'NP1RTOT.UPDRS1' : 'Rater.Completed.Total.UPDRS1','NP1SLPN.UPDRS1' : 'Sleep.Problems.Night.UPDRS1', 'NP1SLPD.UPDRS1' : 'Daytime.Sleepiness.UPDRS1', 'NP1PAIN.UPDRS1' : 'Pain.UPDRS1' , 'NP1URIN.UPDRS1' : 'Urinary.Problems.UPDRS1', 'NP1CNST.UPDRS1' : 'Constipation.Problems.UPDRS1' , 'NP1LTHD.UPDRS1' : 'Lightheadedness.on.Standing.UPDRS1' , 'NP1FATG.UPDRS1' : 'Fatigue.UPDRS1', 'NP1PTOT.UPDRS1' : 'Patient.Completed.Total.UPDRS1','NP2SPCH.UPDRS2' : 'Speech.Difficulty.UPDRS2' , 'NP2SALV.UPDRS2' : 'Saliva.Drooling.UPDRS2' ,'NP2SWAL.UPDRS2': 'Chewing.Swallowing.Difficulty.UPDRS2', 'NP2EAT.UPDRS2' : 'Eating.Difficulty.UPDRS2', 'NP2DRES.UPDRS2' : 'Dressing.Difficulty.UPDRS2', 'NP2HYGN.UPDRS2' : 'Hygiene.Difficulty.UPDRS2' , 'NP2HWRT.UPDRS2' : 'Handwriting.Difficulty.UPDRS2' ,'NP2HOBB.UPDRS2' : 'Hobbies.Difficulty.UPDRS2' ,'NP2TURN.UPDRS2' : 'Turning.in.Bed.Difficulty.UPDRS2', 'NP2TRMR.UPDRS2' : 'Tremor.UPDRS2', 'NP2RISE.UPDRS2' : 'Rising.from.Bed.Difficulty.UPDRS2', 'NP2WALK.UPDRS2' : 'Walking.Difficulty.UPDRS2' ,'NP2FREZ.UPDRS2' : 'Freezing.while.Walking.UPDRS2' , 'NP2PTOT.UPDRS2': 'Total.UPDRS2', 'NP4WDYSK.UPDRS4' : 'Time.Spent.with.Dyskinesias.UPDRS4', 'NP4DYSKI.UPDRS4':'Functional.Impact.of.Dyskinesias.UPDRS4','NP4OFF.UPDRS4' : 'Time.Spent.in.OFF.State.UPDRS4',     'NP4FLCTI.UPDRS4':'Functional.Impact.Fluctuations.UPDRS4',  'NP4FLCTX.UPDRS4':'Complexity.of.Motor.Fluctuations.UPDRS4' ,   'NP4DYSTN.UPDRS4':'Painful.OFF-state.Dystonia.UPDRS4' ,'NP4TOT.UPDRS4': 'Total.UPDRS4','NP4WDYSKDEN.UPDRS4':'Total.Hours.with.Dyskinesias.UPDRS4', 'NP4WDYSKNUM.UPDRS4' :'Total.Hours.Awake.Dysk.UPDRS4', 'NP4WDYSKPCT.UPDRS4' : 'Percent.Dyskinesia.UPDRS4','NP4OFFDEN.UPDRS4':'Total.Hours.OFF.UPDRS4', 'NP4OFFNUM.UPDRS4' : 'Total.Hours.Awake.OFF.UPDRS4','NP4OFFPCT.UPDRS4' : 'Percent.OFF.UPDRS4', 'NP4DYSTNDEN.UPDRS4' :'Total.Hours.OFF.with.Dystonia.UPDRS4',  'NP4DYSTNNUM.UPDRS4':'Total.Hours.OFF.Dyst.UPDRS4', 'NP4DYSTNPCT.UPDRS4':'Percent.OFF.Dystonia.UPDRS4', 'NP3BRADY.UPDRS4' : 'Global.Spontaneity.of.Movement.UPDRS4', 'NP3PTRMR.UPDRS4' : 'Postural.Tremor.Right.Hand.UPDRS4' , 'NP3PTRML.UPDRS4' : 'Postural.Tremor.Left.Hand.UPDRS4' , 'NP3KTRMR.UPDRS4' : 'Kinetic.Tremor.Right.Hand.UPDRS4', 'NP3KTRML.UPDRS4' : 'Kinetic.Tremor.Left.Hand.UPDRS4', 'NP3RTARU.UPDRS4' : 'Rest.Tremor.Amplitude.RUE.UPDRS4', 'NP3RTALU.UPDRS4' : 'Rest.Tremor.Amplitude.LUE.UPDRS4', 'NP3RTARL.UPDRS4' : 'Rest.Tremor.Amplitude.RLE.UPDRS4' ,'NP3RTALL.UPDRS4' : 'Rest.Tremor.Amplitude.LLE.UPDRS4' ,'NP3RTALJ.UPDRS4' : 'Rest.Tremor.Amplitude.Lip.Jaw.UPDRS4', 'NP3RTCON.UPDRS4' : 'Constancy.of.Rest.Tremor.UPDRS4'}, inplace = True)
@@ -238,15 +237,15 @@ def add_diagnosis_change(cohort_df, ppmi_merge) :
 
 
 
-def merge_and_transform_data(file, ppmi_download_path, list_cols, list_cols_drop = False, rename_list= None, merge_on=None, merge_how=None, mod_name=None, decode_list=None,df= None,ext_name = None, ext_drop = None):
+def merge_and_transform_data(file, list_cols, list_cols_drop = False, rename_list= None, merge_on=None, merge_how=None, mod_name=None, decode_list=None,df= None,ext_name = None, ext_drop = None):
     if not isinstance(df, pd.DataFrame): 
         df = pd.DataFrame(columns = ['PATNO','EVENT_ID'])
         
     if merge_on == None and merge_how== None : 
-        df = merge_dfs(ppmi_download_path, df, file, list_cols,list_cols_drop, merge_on=['PATNO', 'EVENT_ID'], merge_how = "outer", ext_name=ext_name, ext_drop=ext_drop)
+        df = merge_dfs(df, file, list_cols,list_cols_drop, merge_on=['PATNO', 'EVENT_ID'], merge_how = "outer", ext_name=ext_name, ext_drop=ext_drop)
 
     else : 
-        df = merge_dfs(ppmi_download_path, df, file, list_cols,  list_cols_drop, merge_on=merge_on, merge_how =merge_how, ext_name= ext_name, ext_drop=ext_drop)
+        df = merge_dfs(df, file, list_cols,  list_cols_drop, merge_on=merge_on, merge_how =merge_how, ext_name= ext_name, ext_drop=ext_drop)
     
     if decode_list:
         df = decode(df, code_list, mod_name, decode_list)
@@ -274,8 +273,8 @@ def decode(df, code_list, MOD_NAME, cols_to_decode, rename_cols = None) :
 
 
 
-def read_and_transform_data(filepath, csv_filename : str, list_cols : List, drop=False) :
-    df = pd.read_csv(filepath + csv_filename, skipinitialspace = True)  ## Read in csv
+def read_and_transform_data(csv_filename : str, list_cols : List, drop=False) :
+    df = pd.read_csv(ppmi_download_path + csv_filename, skipinitialspace = True)  ## Read in csv
     if drop == False :
         df = df[list_cols] # keep columns in list_cols
     else :
@@ -284,8 +283,8 @@ def read_and_transform_data(filepath, csv_filename : str, list_cols : List, drop
 
 
 
-def merge_dfs(filepath : str, df : pd.DataFrame, csv_filename : str, list_cols : List, drop, merge_on : str, merge_how : str, ext_name=None, ext_drop = None) :
-    demo_df = read_and_transform_data(filepath, csv_filename, list_cols, drop) # Read in csv and keep only cols in list_cols
+def merge_dfs(df : pd.DataFrame, csv_filename : str, list_cols : List, drop, merge_on : str, merge_how : str, ext_name=None, ext_drop = None) :
+    demo_df = read_and_transform_data(csv_filename, list_cols, drop) # Read in csv and keep only cols in list_cols
     if ext_name :
         demo_df = add_extension_to_column_names(demo_df, ext_drop, ext_name)
     if csv_filename == 'Socio-Economics_' + date + '.csv' :
@@ -332,8 +331,8 @@ def remove_duplicate_datscans(df):
 
 
 
-def add_mri_csv(df, ppmi_download_path) :
-    mri_df = merge_and_transform_data( 'Magnetic_Resonance_Imaging__MRI__' + date + '.csv', ppmi_download_path, list_cols = [ 'PATNO', 'EVENT_ID', 'INFODT', 'MRICMPLT', 'MRIWDTI', 'MRIWRSS', 'MRIRSLT', 'MRIRSSDF' ], list_cols_drop = False, rename_list= { 'INFODT' : 'Image.Acquisition.Date', 'MRICMPLT' : 'MRI.Completed', 'MRIWDTI' : 'MRI.DTI' , 'MRIWRSS' : 'MRI.Resting.State' , 'MRIRSLT' : 'MRI.Results' , 'MRIRSSDF' : 'Resting.State.Dif.Day.PDMed.Use'}, merge_on=None, merge_how=None, mod_name='MRI', decode_list = ['MRIWDTI','MRIWRSS','MRIRSSDF','MRICMPLT','MRIRSLT'])
+def add_mri_csv(df) :
+    mri_df = merge_and_transform_data( 'Magnetic_Resonance_Imaging__MRI__' + date + '.csv', list_cols = [ 'PATNO', 'EVENT_ID', 'INFODT', 'MRICMPLT', 'MRIWDTI', 'MRIWRSS', 'MRIRSLT', 'MRIRSSDF' ], list_cols_drop = False, rename_list= { 'INFODT' : 'Image.Acquisition.Date', 'MRICMPLT' : 'MRI.Completed', 'MRIWDTI' : 'MRI.DTI' , 'MRIWRSS' : 'MRI.Resting.State' , 'MRIRSLT' : 'MRI.Results' , 'MRIRSSDF' : 'Resting.State.Dif.Day.PDMed.Use'}, merge_on=None, merge_how=None, mod_name='MRI', decode_list = ['MRIWDTI','MRIWRSS','MRIRSSDF','MRICMPLT','MRIRSLT'])
     duplicate_mri = mri_df[['PATNO','EVENT_ID']].duplicated(keep = False) # Find locations of True for duplicated subs w/ 2 MRI at baseline
     duplicate_mri_index = mri_df[duplicate_mri == True].index.tolist() # Get index of duplicates
     dup_subid_list = [] # Initialize duplicate subid list variable
@@ -345,7 +344,7 @@ def add_mri_csv(df, ppmi_download_path) :
 
 
 
-def add_concomitant_med_log(df : pd.DataFrame, ppmi_download_path : str) :
+def add_concomitant_med_log(df : pd.DataFrame) :
     med_df = pd.read_csv(ppmi_download_path + 'Concomitant_Medication_Log_' + date + '.csv', skipinitialspace=True) # Medication history
     med_df.replace({';' : ','}, regex = True, inplace = True) # Replace ';' with ',' in med_df
     # FIXME - do we want to get rid of certain supplements we aren't interested in?  Or leave all?
@@ -368,7 +367,7 @@ def add_concomitant_med_log(df : pd.DataFrame, ppmi_download_path : str) :
 
 
 
-def add_LEDD(ppmi_merge, ppmi_download_path) :
+def add_LEDD(ppmi_merge) :
     def func(row):
         ## If in LD column there is a (i.e. 150 + LD) * 0.33) - create a new duplicate column with just 150 variable - bc this LEDD needs to be added to full LEDD and these formulas are therefore not correct?  # per Pavan notes issues
         if '(' in str(row['LEDD']):
@@ -379,7 +378,7 @@ def add_LEDD(ppmi_merge, ppmi_download_path) :
         return row
 
     ## LEDD Medication Status - FIXME Assumtion : If stop date is NA we assume LEDD only occurred in that month
-    LEDD_med_df = read_and_transform_data(ppmi_download_path, 'LEDD_Concomitant_Medication_Log_' + date + '.csv', ['PATNO', 'LEDD', 'STARTDT', 'STOPDT'], drop = False)
+    LEDD_med_df = read_and_transform_data( 'LEDD_Concomitant_Medication_Log_' + date + '.csv', ['PATNO', 'LEDD', 'STARTDT', 'STOPDT'], drop = False)
     ppmi_merge['INFODT'] = pd.to_datetime(ppmi_merge['INFODT'], format = '%m%Y', errors = 'ignore') # change to INFODT to type datetime so we can sort according to date
     LEDD_med_df['STARTDT'] = pd.to_datetime(LEDD_med_df['STARTDT'], format = '%m%Y', errors = 'ignore') # change to STARTDT to type datetime so we can sort according to date
     LEDD_med_df['STOPDT'] = pd.to_datetime(LEDD_med_df['STOPDT'], format = '%m%Y', errors = 'ignore') # change to STOPDT to type datetime so we can sort according to date
@@ -416,7 +415,7 @@ def add_LEDD(ppmi_merge, ppmi_download_path) :
 
 
     ## GET LEVODOPA ONLY FOR BELOW CALCULATIONS - # FIXME - need more clarification before adding this
-    LEDD_med_df = read_and_transform_data(ppmi_download_path, 'LEDD_Concomitant_Medication_Log_' + date + '.csv', ['PATNO','LEDTRT', 'LEDD', 'STARTDT', 'STOPDT'], drop = False)
+    LEDD_med_df = read_and_transform_data('LEDD_Concomitant_Medication_Log_' + date + '.csv', ['PATNO','LEDTRT', 'LEDD', 'STARTDT', 'STOPDT'], drop = False)
     search_for = ['levodopa', 'sinemet', 'rytary', 'stalevo'] # FIXME per Pavan comments but there might be others
     levodopa_only = LEDD_med_df[LEDD_med_df["LEDTRT"].str.contains('|'.join(search_for), case = False) == True]
     levodopa_only = pd.concat([func(row) for _, row in levodopa_only.iterrows()], ignore_index=True, axis=1).T
@@ -459,7 +458,7 @@ def add_LEDD(ppmi_merge, ppmi_download_path) :
     ppmi_merge.drop(['Levodopa.only'], axis = 1, inplace = True) # Drop
     
     ## LEDD Medication Status - FIXME Assumption : If stop date is NA we assume therapy is ongoing
-    LEDD_med_df = read_and_transform_data(ppmi_download_path, 'LEDD_Concomitant_Medication_Log_' + date + '.csv', ['PATNO', 'LEDD', 'STARTDT', 'STOPDT'], drop = False)
+    LEDD_med_df = read_and_transform_data('LEDD_Concomitant_Medication_Log_' + date + '.csv', ['PATNO', 'LEDD', 'STARTDT', 'STOPDT'], drop = False)
     ppmi_merge['INFODT'] = pd.to_datetime(ppmi_merge['INFODT'], format = '%m%Y', errors = 'ignore') # Change to INFODT to type datetime so we can sort according to date
     LEDD_med_df['STARTDT'] = pd.to_datetime(LEDD_med_df['STARTDT'], format = '%m%Y', errors = 'ignore') # Change to INFODT to type datetime so we can sort according to date
     LEDD_med_df['STOPDT'] = pd.to_datetime(LEDD_med_df['STOPDT'], format = '%m%Y', errors = 'ignore') # Change to INFODT to type datetime so we can sort according to date
@@ -497,7 +496,7 @@ def add_LEDD(ppmi_merge, ppmi_download_path) :
 
     ## If in LD column there is a (i.e. 150 + LD) * 0.33) - create a new duplicate column with just 150 variable - bc this LEDD needs to be added to full LEDD and these formulas are therefore not correct?  # per Pavan notes issues
     ## GET LEVODOPA ONLY FOR BELOW CALCULATIONS - # FIXME - need more clarification before adding this
-    LEDD_med_df = read_and_transform_data(ppmi_download_path, 'LEDD_Concomitant_Medication_Log_' + date + '.csv', ['PATNO','LEDTRT', 'LEDD', 'STARTDT', 'STOPDT'], drop = False)
+    LEDD_med_df = read_and_transform_data('LEDD_Concomitant_Medication_Log_' + date + '.csv', ['PATNO','LEDTRT', 'LEDD', 'STARTDT', 'STOPDT'], drop = False)
     search_for = ['levodopa', 'sinemet', 'rytary', 'stalevo'] # FIXME per Pavan comments but there might be others
     levodopa_only = LEDD_med_df[LEDD_med_df["LEDTRT"].str.contains('|'.join(search_for), case = False) == True]
     levodopa_only = pd.concat([func(row) for _, row in levodopa_only.iterrows()], ignore_index=True, axis=1).T
@@ -556,7 +555,7 @@ def make_categorical_LEDD_col(df, df_col, new_df_col, num_categories) :
 
 
 
-def add_comorbidities(ppmi_merge, ppmi_download_path) :
+def add_comorbidities(ppmi_merge) :
     ## Comorbidities # FIXME not useful column
     comorbid_df = pd.read_csv(ppmi_download_path + 'Medical_Conditions_Log_' + date + '.csv', skipinitialspace=True) # Medication history
     comorbid_df.replace({';' : ','}, regex = True, inplace = True) # Replace ';' with ','
@@ -705,7 +704,7 @@ def isNaN(num):
 def get_enrollment_dx_nonanalytic(df, cohort_df) : 
     analytic_cohort_subids = cohort_df['PATNO'].unique().tolist() # subids for analytic cohort
     df['Analytic.Cohort'] = df['PATNO'].apply(lambda x: 'Analytic Cohort' if x in analytic_cohort_subids else 'Not Analytic Cohort')
-    participant_status = read_and_transform_data(ppmi_download_path, 'Participant_Status_' + date + '.csv',['PATNO', 'COHORT_DEFINITION'], drop = False )    ## Get Enrollment Diagnosis for subjects in Not Analytic Cohort - do this using the participants_status.csv
+    participant_status = read_and_transform_data('Participant_Status_' + date + '.csv',['PATNO', 'COHORT_DEFINITION'], drop = False )    ## Get Enrollment Diagnosis for subjects in Not Analytic Cohort - do this using the participants_status.csv
     participant_status.rename(columns = {'COHORT_DEFINITION' : 'Enroll.Diagnosis'}, inplace = True)
     not_analytic = df[df['Analytic.Cohort'] == 'Not Analytic Cohort'] # Split up Analytic cohort df and not Analytic Cohort df    
     not_analytic_participant_status = pd.merge(not_analytic, participant_status, on = ['PATNO'], how = "left") # Merge not Atlantic subids with enrollment diagnosis in participant_status
@@ -740,12 +739,13 @@ def fixed_variables(df: pd.DataFrame, fixed_var_list: List[str]) -> pd.DataFrame
 
 def add_Visit(df) :
     df['Visit'] = np.NaN # Initialize Visit col
-    searchfor = ['BL', 'V', 'R'] # Strings to search for
+    searchfor = ['BL', 'V', 'R', 'TANS'] # Strings to search for
     temp = df['EVENT_ID'].str.contains('|'.join(searchfor)) # locations of where row contains str: baseline or visit month
     df['Visit'].loc[temp == True] = df['EVENT_ID'].loc[temp == True] # Fill in 'Visit' col with event.ID for baseline or visit month
     df['Visit'] = df['Visit'].str.replace("R", "") # Replace Remote visit month with '' (want only month number)
     df['Visit'] = df['Visit'].str.replace("V", "") # Replace Visit month with '' (want only month number)
     df['Visit'] = df['Visit'].str.replace("BL", "0") # Replace baseline with 0
+    df['Visit'] = df['Visit'].str.replace("TANS", "NA") # Replace baseline with 0
     return df
 
 
