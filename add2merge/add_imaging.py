@@ -21,8 +21,8 @@ def main() :
     ppmi_merge = merge_mm(ppmi_merge, 'DTI')
     ppmi_merge.to_csv(userdir + 'ppmi_merge_dti_' + version + '.csv')
     ppmi_merge.set_index('Subject.ID', inplace = True)
+    ppmi_merge = ppmi_merge.loc[:, ~ppmi_merge.columns.str.startswith(tuple(['Unnamed']))]
     ppmi_merge.to_csv(userdir + 'ppmi_merge_clinical_imaging_' + version + '.csv')
-
 
 
 
@@ -38,7 +38,6 @@ def merge_mm(ppmi_merge, search_string) :
     
     ## Merge 
     ppmi_merge_appended = pd.merge(ppmi_merge, appended_data_df, on = ['Subject.ID', 'Event.ID.Date'], how = "left")
-    
     return ppmi_merge_appended
 
 
@@ -216,6 +215,9 @@ def add_bestImageAcquisitionDate(df) :
                 maxidx = selu[['resnetGrade']].idxmax() # Get the higher resnetGrade for each visit if there are more than one
                 df.loc[maxidx, 'bestAtImage.Acquisition.Date'] = True
     return df
+
+
+
 
 
 
