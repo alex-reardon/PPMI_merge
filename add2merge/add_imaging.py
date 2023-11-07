@@ -15,16 +15,35 @@ prefix = 'ppmi_500_updated_cohort/processed/PPMI/'
 
  
 def main() :
-    
-    ppmi_merge = pd.read_csv(userdir + 'ppmi_merge_' + version + '.csv')
+    ppmi_merge = pd.read_csv(userdir + 'ppmi_merge_clinical_' + version + '.csv')
     ppmi_merge = merge_mm(ppmi_merge, 'T1wHierarchical')
+    ppmi_merge.to_csv(userdir + 'ppmi_merge_t1w_' + version + '.csv')
     ppmi_merge = merge_mm(ppmi_merge, 'DTI')
+    ppmi_merge.to_csv(userdir + 'ppmi_merge_dti_' + version + '.csv')
+    ppmi_merge.set_index('Subject.ID', inplace = True)
+    ppmi_merge.to_csv(userdir + 'ppmi_merge_clinical_imaging_' + version + '.csv')
 
 
 
 
 def merge_mm(ppmi_merge, search_string) : 
     keys = search_s3(bucket, prefix, search_string, 'mmwide.csv')
+    appended_data_df = process_s3_files(keys)
+   
+    ## Remove duplicate columns before merge 
+    common_columns = appended_data_df.columns.intersection(ppmi_merge.columns)
+    columns_to_exclude = ['Subject.ID', 'Event.ID.Date']    # Define columns to exclude from removal
+    common_columns = common_columns.difference(columns_to_exclude) # Remove the excluded columns from the list of common columns
+    appended_data_df = appended_data_df.drop(columns=common_columns)    # Drop the common columns from df1
+    
+    ## Merge 
+    ppmi_merge_appended = pd.merge(ppmi_merge, appended_data_df, on = ['Subject.ID', 'Event.ID.Date'], how = "left")
+    
+    return ppmi_merge_appended
+
+
+
+def process_s3_files(keys) : 
     client = boto3.client('s3', region_name="us-east-1")
     appended_data = []
     for key in keys :
@@ -41,13 +60,8 @@ def merge_mm(ppmi_merge, search_string) :
         df['Event.ID.Date'] = month_date
         appended_data.append(df)
     appended_data_df = pd.concat(appended_data)
-    
-    common_columns = appended_data_df.columns.intersection(ppmi_merge.columns)
-    columns_to_exclude = ['Subject.ID', 'Event.ID.Date']    # Define columns to exclude from removal
-    common_columns = common_columns.difference(columns_to_exclude) # Remove the excluded columns from the list of common columns
-    appended_data_df = appended_data_df.drop(columns=common_columns)    # Drop the common columns from df1
-    ppmi_merge_appended = pd.merge(ppmi_merge, appended_data_df, on = ['Subject.ID', 'Event.ID.Date'], how = "left")
-    return ppmi_merge_appended
+    return appended_data_df
+
 
 
 
@@ -202,9 +216,6 @@ def add_bestImageAcquisitionDate(df) :
                 maxidx = selu[['resnetGrade']].idxmax() # Get the higher resnetGrade for each visit if there are more than one
                 df.loc[maxidx, 'bestAtImage.Acquisition.Date'] = True
     return df
-
-
-
 
 
 
