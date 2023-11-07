@@ -3,13 +3,11 @@ import numpy as np
 from typing import List
 
 
-
 # Set up paths and load in data 
 userdir = '/Users/areardon/Desktop/Projects/PPMI_Merge3_20230920/'
 genetics_path = userdir + 'genetic_data/'
 version = 'v0.1.1'
-ppmi_merge = pd.read_csv(userdir + 'ppmi_merge_' + version + '.csv')
-
+ppmi_merge = pd.read_csv(userdir + 'ppmi_merge_clinical_imaging_' + version + '.csv')
 
 
 def main() :    
@@ -29,7 +27,8 @@ def add_genetics_info(ppmi_merge) :
     # Merge genetics df with ppmi_merge clinical df 
     ppmi_merge = pd.merge(ppmi_merge, genetics_df, on = 'Subject.ID', how = "outer")
     ppmi_merge = add_snp_recode(ppmi_merge)## Add in Brian's snp_rs6265_recode.csv file sent on slack 6/29/22
-    ppmi_merge.to_csv(userdir + 'ppmi_merge_genetics_' + version + '.csv')
+    ppmi_merge.set_index('Subject.ID', inplace = True)
+    ppmi_merge.to_csv(userdir + 'ppmi_merge_clinical_imaging_genetics_' + version + '.csv')
     return ppmi_merge
 
 
