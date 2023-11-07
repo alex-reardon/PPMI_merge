@@ -11,8 +11,8 @@ import glob
 userdir = '/Users/areardon/Desktop/Projects/PPMI_Merge3_20230920/'
 ppmi_download_path = '/Users/areardon/Desktop/Projects/PPMI_Merge3_20230920/PPMI_Study_Downloads_20230920/'
 date = '20Sep2023'
-version = '0.1.1'
-code_list = pd.read_csv(glob.glob(ppmi_download_path + 'Code_List*Annotated__*.csv')[0])  # FIXME OR HARMONIZED?
+version = 'v0.1.1'
+code_list = pd.read_csv(glob.glob(ppmi_download_path + 'Code_List*Annotated__*.csv')[0])  
     
     
 def main() :
@@ -124,7 +124,7 @@ def cleanup(ppmi_merge) :
     ppmi_merge = reindex_df(ppmi_merge)
     ppmi_merge.set_index('Subject.ID', inplace = True)
     ppmi_merge.fillna('NA', inplace = True)
-    ppmi_merge.to_csv(userdir + 'ppmi_merge_v' + version + '.csv')
+    ppmi_merge.to_csv(userdir + 'ppmi_merge_clinical_' + version + '.csv')
     return ppmi_merge
     
 
